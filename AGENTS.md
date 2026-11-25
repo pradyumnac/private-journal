@@ -58,10 +58,6 @@ All operations require an active timeout-based `unlock` session, except `unlock`
 
 ## Roadmap
 
-1. First-run setup (password, TOTP provisioning, XDG/custom path)
-2. Crypto layer (`cryptography` Argon2id, HKDF, AEAD, `pyotp` replay check, `mlock`/zeroize key buffers, `RLIMIT_CORE=0`)
-3. Encrypted storage and filename encryption
-4. Local session daemon (Unix socket, timed `unlock`, `lock`, `status`)
-5. Sandboxed `nvim` integration (`new`, `edit`) and read-only `view`
-6. Transient full-text and tag indexing (`search` + filters)
-7. Config management (`config get` / `config set`) and CLI QoL flags
+| Feature | Status |
+| --- | --- |
+| No pending items (core roadmap complete) | — |

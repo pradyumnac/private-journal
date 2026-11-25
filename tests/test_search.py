@@ -82,8 +82,8 @@ def test_select_entry_with_fzf_no_history(tmp_path, monkeypatch):
     lines = format_search_lines([entry])
     assert len(lines) == 1
     assert "2026-04-01" in lines[0]
-    assert "#focus" in lines[0]
     assert "First line" in lines[0]
+    assert lines[0].endswith("[focus]")
 
     seen_cmd: list[str] = []
 

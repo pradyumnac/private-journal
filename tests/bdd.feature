@@ -175,7 +175,7 @@ Feature: Transient Full-Text & Tag Search with fzf
   Scenario: Select an entry interactively via fzf with history disabled
     Given matching search results
     When interactive fzf selection is invoked
-    Then fzf is launched with --no-history and displays date, tags, and a one-line snippet
+    Then fzf is launched with --no-history and displays date, one-line snippet, and tags appended in brackets ([tag1, tag2])
     And selecting a line returns the corresponding entry ID
     And cancelling fzf returns None without error
 

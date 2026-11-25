@@ -60,10 +60,10 @@ def format_search_lines(entries: list[JournalEntry]) -> list[str]:
     lines: list[str] = []
     for entry in entries:
         date_str = datetime.fromtimestamp(entry.created_at, tz=timezone.utc).strftime("%Y-%m-%d")
-        tags_str = " ".join(f"#{t}" for t in entry.tags) if entry.tags else "-"
         first_line = next((ln.strip() for ln in entry.body.splitlines() if ln.strip()), "")
         snippet = first_line[:80] + ("..." if len(first_line) > 80 else "")
-        lines.append(f"{entry.id}\t{date_str}\t{tags_str}\t{snippet}")
+        tags_bracket = f"[{', '.join(entry.tags)}]" if entry.tags else "[]"
+        lines.append(f"{entry.id}\t{date_str}\t{snippet}\t{tags_bracket}")
     return lines
 
 
