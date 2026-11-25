@@ -18,16 +18,16 @@ Replay locally with `asciinema play docs/demo.cast`, or regenerate with `mise ru
 
 ## Installation
 
-Install from the private GitHub repository using SSH or a configured Git credential helper:
+Install the latest release from the private GitHub repository using SSH or a configured Git credential helper:
 
 ```bash
-pip install "git+ssh://git@github.com/pradyumnac/private-journal.git@v0.1.2"
+pip install "git+ssh://git@github.com/pradyumnac/private-journal.git@latest"
 ```
 
 Or install as an isolated CLI tool with `uv`:
 
 ```bash
-uv tool install "git+ssh://git@github.com/pradyumnac/private-journal.git@v0.1.2"
+uv tool install "git+ssh://git@github.com/pradyumnac/private-journal.git@latest"
 ```
 
 ## User Documentation
@@ -85,6 +85,7 @@ pj config set data_dir ~/vault   # Set custom vault directory
 ```bash
 mise run test                    # Run pytest suite
 mise run demo                    # Record asciinema cast and render SVG demo
-mise run release                 # Run tests + demo gate, build, tag, and create GitHub Release
+mise run bump                    # Bump version (patch|minor|major), lock, commit, and push
+mise run release                 # Verify clean synced tree + tests + demo, build, tag, and release
 uv run python scripts/demo_lifecycle.py -v --fast  # Run isolated /tmp lifecycle demo
 ```
