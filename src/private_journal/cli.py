@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import click
+import qrcode
 from click.shell_completion import get_completion_class
 
 from private_journal.config import ConfigError, get_config_value, load_config, set_config_value
@@ -165,6 +167,12 @@ def setup(reset: bool, totp: bool | None) -> None:
     if enable_totp:
         click.echo(f"TOTP Secret: {res.totp_secret}")
         click.echo(f"TOTP URI:    {res.totp_uri}")
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(res.totp_uri)
+        qr_buf = io.StringIO()
+        qr.print_ascii(out=qr_buf, invert=True)
+        click.echo(qr_buf.getvalue(), nl=False)
+        del qr, qr_buf, res
 
 
 @cli.command(help="Verify credentials and start timed session.")

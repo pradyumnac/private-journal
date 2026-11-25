@@ -12,6 +12,7 @@ dependencies = [
     "click>=8.5.1",
     "cryptography>=50.0.2",
     "pyotp>=2.12.1",
+    "qrcode>=8.2",
 ]
 
 [project.urls]

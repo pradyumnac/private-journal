@@ -66,7 +66,9 @@ def test_cli_setup_and_unlock_requires_setup(tmp_path, monkeypatch, capsys):
         if token.startswith("otpauth://"):
             secret = token.split("secret=")[1].split("&")[0]
     assert secret
+    assert "█" in out or "▀" in out or "▄" in out
     assert (xdg_data / "private-journal" / "vault.json").exists()
+    assert not list((xdg_data / "private-journal").glob("*.png"))
 
     # unlock now succeeds with password + TOTP
     monkeypatch.setattr(

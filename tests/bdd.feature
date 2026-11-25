@@ -194,7 +194,7 @@ Feature: Config Management & Thin CLI (pj)
     When the user runs pj unlock before setup
     Then unlock fails with an error instructing the user to run pj setup
     When the user runs pj setup and completes password prompts
-    Then the vault is initialized, the TOTP secret and URI are shown, and pj unlock succeeds
+    Then the vault is initialized, the TOTP secret, URI, and terminal QR code are shown (without writing QR files or plaintext secrets to disk), and pj unlock succeeds
 
   Scenario: Reject setup on existing vault unless --reset is confirmed
     Given an already initialized vault
