@@ -18,18 +18,16 @@ Replay locally with `asciinema play docs/demo.cast`, or regenerate with `mise ru
 
 ## Installation
 
-Install the pre-built wheel directly from GitHub Releases (no cloning):
+Install the latest release with `pip`, `uv`, `pipx`, or `mise`:
 
 ```bash
+# Direct wheel from GitHub Releases (no cloning):
 pip install "https://github.com/pradyumnac/private-journal/releases/download/v0.1.2/private_journal-0.1.2-py3-none-any.whl"
-# or with uv:
-uv tool install "https://github.com/pradyumnac/private-journal/releases/download/v0.1.2/private_journal-0.1.2-py3-none-any.whl"
-```
 
-Or install the floating `latest` release tag via Git:
-
-```bash
-pip install "git+https://github.com/pradyumnac/private-journal.git@latest"
+# Isolated CLI install (floating @latest release tag):
+uv tool install "git+https://github.com/pradyumnac/private-journal.git@latest"
+pipx install "git+https://github.com/pradyumnac/private-journal.git@latest"
+mise use -g "pipx:git+https://github.com/pradyumnac/private-journal@latest"
 ```
 
 ## User Documentation
