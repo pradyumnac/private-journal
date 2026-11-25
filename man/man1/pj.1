@@ -1,0 +1,69 @@
+.TH PJ 1 "2026-11-25" "private-journal 0.1.0" "User Commands"
+.SH NAME
+pj \- private, single-user, 2FA-gated encrypted CLI journal
+.SH SYNOPSIS
+.B pj
+[\fB\-\-help\fR]
+[\fB\-\-version\fR]
+.I command
+[\fIargs...\fR]
+.SH DESCRIPTION
+.B pj
+is a CLI-only encrypted journal. All entry contents, metadata, and file names are encrypted at rest with ChaCha20-Poly1305 using per-file HKDF subkeys derived from an Argon2id Master Key.
+.PP
+A local Unix-socket session daemon holds the unlocked Master Key in locked memory for a configurable timeout (default 15m). All commands except
+.BR unlock ,
+.BR lock ,
+.BR status ,
+and
+.BR \-\-help / \-\-version
+require an active unlocked session.
+.SH COMMANDS
+.TP
+.B unlock
+Verify password and Google Authenticator TOTP code to start or extend the timed session. Triggers first-run setup if no vault exists.
+.TP
+.B lock
+Lock immediately, zeroize key buffers, and stop the session daemon.
+.TP
+.B status
+Show current lock state and remaining session timeout.
+.TP
+.B new [\-\-tag TAG]...
+Create a new entry using sandboxed
+.BR nvim
+(\fB\-n \-i NONE\fR, \fBnobackup\fR, \fBnoundofile\fR, \fBnoswapfile\fR) on a \fB0600\fR temp file in \fB$XDG_RUNTIME_DIR\fR, wiped and deleted on exit.
+.TP
+.B edit ID [\-\-tag TAG]...
+Edit an existing entry in sandboxed
+.BR nvim .
+.TP
+.B view ID
+Display a decrypted entry read-only.
+.TP
+.B delete ID
+Delete an encrypted entry.
+.TP
+.B search [QUERY] [\-\-tag TAG]... [\-\-after YYYY-MM-DD] [\-\-before YYYY-MM-DD] [\-\-plain | \-\-id | \-\-edit]
+Search unlocked entries in a transient in-memory index and pick via
+.BR fzf
+(\fB\-\-no-history\fR). Opens \fBview\fR on selection by default.
+.TP
+.B config get KEY
+Read \fBunlock_timeout\fR or \fBdata_dir\fR.
+.TP
+.B config set KEY VALUE
+Update \fBunlock_timeout\fR or \fBdata_dir\fR.
+.SH FILES
+.TP
+.I $XDG_CONFIG_HOME/private-journal/config.json
+User configuration (\fB0600\fR).
+.TP
+.I $XDG_DATA_HOME/private-journal/
+Vault metadata (\fBvault.json\fR) and encrypted entries (\fBentries/*.enc\fR).
+.TP
+.I $XDG_RUNTIME_DIR/private-journal/daemon.sock
+Local \fB0600\fR Unix domain socket for the active session daemon.
+.SH SEE ALSO
+.BR nvim (1),
+.BR fzf (1)

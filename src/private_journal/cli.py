@@ -30,7 +30,20 @@ def _get_version() -> str:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="pj", description="Private encrypted CLI journal.")
+    parser = argparse.ArgumentParser(
+        prog="pj",
+        description="Private, single-user, 2FA-gated encrypted CLI journal.",
+        epilog=(
+            "examples:\n"
+            "  pj unlock                         Start timed session (runs setup on first use)\n"
+            "  pj new --tag work --tag notes     Create a new entry in sandboxed nvim\n"
+            "  pj search \"argon2\" --tag work     Search entries and pick via fzf\n"
+            "  pj view <id>                      Display an entry read-only\n"
+            "  pj edit <id>                      Edit an entry in sandboxed nvim\n"
+            "  pj status / pj lock               Check TTL or lock immediately\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -39,11 +52,11 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status", help="Show lock state and remaining timeout.")
 
     p_new = sub.add_parser("new", help="Create a new journal entry via sandboxed nvim.")
-    p_new.add_argument("--tag", action="append", default=[], help="Tag for the entry.")
+    p_new.add_argument("--tag", action="append", default=[], help="Tag for the entry (repeatable).")
 
     p_edit = sub.add_parser("edit", help="Edit an existing entry via sandboxed nvim.")
     p_edit.add_argument("id", help="Entry ID.")
-    p_edit.add_argument("--tag", action="append", default=None, help="Replace entry tags.")
+    p_edit.add_argument("--tag", action="append", default=None, help="Replace entry tags (repeatable).")
 
     p_view = sub.add_parser("view", help="Display an entry read-only.")
     p_view.add_argument("id", help="Entry ID.")
@@ -51,23 +64,27 @@ def _build_parser() -> argparse.ArgumentParser:
     p_del = sub.add_parser("delete", help="Delete an entry.")
     p_del.add_argument("id", help="Entry ID.")
 
-    p_search = sub.add_parser("search", help="Search/list entries via transient index and fzf.")
+    p_search = sub.add_parser(
+        "search",
+        help="Search/list entries via transient index and fzf.",
+        description="Search unlocked entries in memory. Lists all entries when no query or filter is given.",
+    )
     p_search.add_argument("query", nargs="?", default=None, help="Full-text query.")
-    p_search.add_argument("--tag", action="append", default=[], help="Filter by tag.")
-    p_search.add_argument("--after", default=None, help="Start date (YYYY-MM-DD).")
-    p_search.add_argument("--before", default=None, help="End date (YYYY-MM-DD).")
+    p_search.add_argument("--tag", action="append", default=[], help="Filter by tag (repeatable).")
+    p_search.add_argument("--after", default=None, help="Start date (YYYY-MM-DD, UTC).")
+    p_search.add_argument("--before", default=None, help="End date (YYYY-MM-DD, UTC).")
     mode = p_search.add_mutually_exclusive_group()
     mode.add_argument("--plain", action="store_true", help="Print matching lines to stdout.")
     mode.add_argument("--id", action="store_true", help="Print selected entry ID.")
     mode.add_argument("--edit", action="store_true", help="Open selected entry in nvim.")
 
-    p_cfg = sub.add_parser("config", help="Read or update configuration.")
+    p_cfg = sub.add_parser("config", help="Read or update configuration (unlock_timeout, data_dir).")
     cfg_sub = p_cfg.add_subparsers(dest="config_action", required=True)
     p_cget = cfg_sub.add_parser("get", help="Get a config value.")
-    p_cget.add_argument("key")
+    p_cget.add_argument("key", help="Config key (unlock_timeout, data_dir).")
     p_cset = cfg_sub.add_parser("set", help="Set a config value.")
-    p_cset.add_argument("key")
-    p_cset.add_argument("value")
+    p_cset.add_argument("key", help="Config key (unlock_timeout, data_dir).")
+    p_cset.add_argument("value", help="New config value.")
 
     return parser
 
