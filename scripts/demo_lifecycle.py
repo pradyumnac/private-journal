@@ -213,7 +213,7 @@ class DemoRunner:
     def _setup_via_cli(self, password: str) -> str:
         """Invoke pj setup in the isolated sandbox env without touching host XDG_CONFIG_HOME."""
         proc = subprocess.run(
-            [sys.executable, "-m", "private_journal.cli", "setup"],
+            [sys.executable, "-m", "private_journal.cli", "setup", "--totp"],
             env=self.env,
             input=f"{password}\n{password}\n",
             text=True,

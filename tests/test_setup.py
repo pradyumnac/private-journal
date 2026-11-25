@@ -51,6 +51,26 @@ def test_initialize_vault_custom_path(tmp_path, monkeypatch):
     cfg = json.loads(config_path.read_text(encoding="utf-8"))
     assert cfg["data_dir"] == str(custom_data)
     assert cfg["unlock_timeout"] == "15m"
+    assert cfg["totp_enabled"] is True
+
+
+# Traceability: Feature "First-run Setup & Vault Initialization"
+# Scenario: Opt-in TOTP during setup and password-only unlock when disabled
+def test_initialize_vault_without_totp(tmp_path, monkeypatch):
+    xdg_config = tmp_path / "xdg_config"
+    custom_data = tmp_path / "no_totp_vault"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config))
+
+    result = initialize_vault(password=b"pw-only-123", data_dir=custom_data, enable_totp=False)
+    assert result.totp_secret == ""
+    assert result.totp_uri == ""
+
+    meta = json.loads((custom_data / "vault.json").read_text(encoding="utf-8"))
+    assert "key_check" in meta
+    assert "encrypted_totp" not in meta
+
+    cfg = json.loads((xdg_config / "private-journal" / "config.json").read_text(encoding="utf-8"))
+    assert cfg["totp_enabled"] is False
 
 
 # Traceability: Feature "First-run Setup & Vault Initialization"

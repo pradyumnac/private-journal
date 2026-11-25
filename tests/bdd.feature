@@ -203,6 +203,14 @@ Feature: Config Management & Thin CLI (pj)
     When the user runs pj setup --reset and confirms the challenge reset
     Then the vault challenge (password and TOTP secret) is reset and a new TOTP URI is shown
 
+  Scenario: Opt-in TOTP during setup and password-only unlock when disabled
+    Given no initialized vault exists
+    When the user runs pj setup and declines TOTP (or omits --totp)
+    Then config.json records totp_enabled as false and no TOTP secret is provisioned
+    And pj unlock succeeds with password only and rejects wrong passwords
+    When the user runs pj setup --reset --totp
+    Then config.json records totp_enabled as true and a TOTP secret and URI are provisioned
+
   Scenario: Reject protected CLI commands while locked
     Given a locked or unauthenticated session
     When the user runs new, edit, view, delete, search, or config get/set

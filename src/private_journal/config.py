@@ -17,11 +17,12 @@ class ConfigError(Exception):
     """Raised on invalid configuration keys or values."""
 
 
-def load_config() -> dict[str, str]:
+def load_config() -> dict[str, object]:
     """Load config.json with defaults."""
-    cfg = {
+    cfg: dict[str, object] = {
         "data_dir": str(get_xdg_data_dir()),
         "unlock_timeout": DEFAULT_UNLOCK_TIMEOUT,
+        "totp_enabled": False,
     }
     config_path = get_config_path()
     if config_path.exists():
@@ -29,14 +30,18 @@ def load_config() -> dict[str, str]:
         for key in ALLOWED_CONFIG_KEYS:
             if key in raw:
                 cfg[key] = str(raw[key])
+        if "totp_enabled" in raw:
+            cfg["totp_enabled"] = bool(raw["totp_enabled"])
     return cfg
 
 
 def get_config_value(key: str) -> str:
-    """Return the value for an allowed configuration key."""
+    """Return the value for a readable configuration key."""
+    if key == "totp_enabled":
+        return "true" if load_config().get("totp_enabled") else "false"
     if key not in ALLOWED_CONFIG_KEYS:
         raise ConfigError(f"Unknown config key: {key}")
-    return load_config()[key]
+    return str(load_config()[key])
 
 
 def set_config_value(key: str, value: str) -> None:

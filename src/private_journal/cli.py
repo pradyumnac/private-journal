@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -127,11 +128,12 @@ def cli(ctx: click.Context) -> None:
     ctx.obj = SessionClient()
 
 
-@cli.command(help="Initialize a new vault with password + TOTP. (alias: su)")
+@cli.command(help="Initialize a new vault with password and optional TOTP.")
 @click.option("--reset", is_flag=True, help="Reset existing vault password/TOTP challenge after confirmation.")
-def setup(reset: bool) -> None:
+@click.option("--totp/--no-totp", default=None, help="Enable or disable Google Authenticator TOTP 2FA.")
+def setup(reset: bool, totp: bool | None) -> None:
     cfg = load_config()
-    data_dir = Path(cfg["data_dir"])
+    data_dir = Path(str(cfg["data_dir"]))
     vault_file = data_dir / "vault.json"
 
     if vault_file.exists():
@@ -148,24 +150,38 @@ def setup(reset: bool) -> None:
     pw2 = click.prompt("Confirm vault password", hide_input=True, err=True)
     if pw1 != pw2:
         raise SetupError("Passwords do not match.")
-    res = initialize_vault(password=pw1.encode("utf-8"), data_dir=data_dir, reset=reset)
+    enable_totp = (
+        totp
+        if totp is not None
+        else click.confirm("Enable Google Authenticator TOTP 2FA?", default=False, err=True)
+    )
+    res = initialize_vault(
+        password=pw1.encode("utf-8"),
+        data_dir=data_dir,
+        reset=reset,
+        enable_totp=enable_totp,
+    )
     click.echo(f"Vault initialized at {res.data_dir}")
-    click.echo(f"TOTP Secret: {res.totp_secret}")
-    click.echo(f"TOTP URI:    {res.totp_uri}")
+    if enable_totp:
+        click.echo(f"TOTP Secret: {res.totp_secret}")
+        click.echo(f"TOTP URI:    {res.totp_uri}")
 
 
-@cli.command(help="Verify password + TOTP and start timed session. (alias: ul)")
+@cli.command(help="Verify credentials and start timed session.")
 @click.pass_obj
 def unlock(client: SessionClient) -> None:
     cfg = load_config()
-    data_dir = Path(cfg["data_dir"])
+    data_dir = Path(str(cfg["data_dir"]))
     vault_file = data_dir / "vault.json"
 
     if not vault_file.exists():
         raise SetupError("Vault is not initialized. Run 'pj setup' first.")
 
+    meta = json.loads(vault_file.read_text(encoding="utf-8"))
+    totp_enabled = bool(meta.get("totp_enabled", cfg.get("totp_enabled", False)))
+
     password = click.prompt("Password", hide_input=True, err=True).encode("utf-8")
-    totp_code = click.prompt("TOTP code", err=True).strip()
+    totp_code = click.prompt("TOTP code", err=True).strip() if totp_enabled else ""
     status = client.unlock(password=password, totp_code=totp_code)
     click.echo(f"Unlocked for {int(status.remaining_seconds)}s.")
 

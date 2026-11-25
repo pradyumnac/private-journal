@@ -27,7 +27,7 @@ from private_journal.crypto import (
     verify_totp_code,
 )
 from private_journal.paths import get_config_path, get_xdg_data_dir, get_xdg_runtime_dir
-from private_journal.setup import TOTP_AD
+from private_journal.setup import KEY_CHECK_AD, KEY_CHECK_PLAINTEXT, TOTP_AD
 from private_journal.storage import (
     JournalEntry,
     StorageError,
@@ -176,18 +176,24 @@ class _SessionDaemon:
 
         meta = json.loads(vault_path.read_text(encoding="utf-8"))
         salt = base64.b64decode(meta["salt"])
-        encrypted_totp = base64.b64decode(meta["encrypted_totp"])
+        totp_enabled = bool(meta.get("totp_enabled", "encrypted_totp" in meta))
 
         candidate_mk = derive_master_key(password, salt)
         try:
-            totp_subkey = derive_subkey(candidate_mk, b"totp-secret")
-            secret = aead_decrypt(totp_subkey, encrypted_totp, TOTP_AD).decode("utf-8")
-            accepted_tc = verify_totp_code(secret, totp_code, self._last_timecode)
+            if "key_check" in meta:
+                check_subkey = derive_subkey(candidate_mk, b"key-check")
+                if aead_decrypt(check_subkey, base64.b64decode(meta["key_check"]), KEY_CHECK_AD) != KEY_CHECK_PLAINTEXT:
+                    raise CryptoError("Invalid password.")
+            if totp_enabled:
+                encrypted_totp = base64.b64decode(meta["encrypted_totp"])
+                totp_subkey = derive_subkey(candidate_mk, b"totp-secret")
+                secret = aead_decrypt(totp_subkey, encrypted_totp, TOTP_AD).decode("utf-8")
+                accepted_tc = verify_totp_code(secret, totp_code, self._last_timecode)
+                self._last_timecode = accepted_tc
         except CryptoError as exc:
             candidate_mk.zeroize()
             raise SessionError(f"Authentication failed: {exc}") from exc
 
-        self._last_timecode = accepted_tc
         if self._master_key is not None:
             self._master_key.zeroize()
         self._master_key = candidate_mk
@@ -360,7 +366,7 @@ class SessionClient:
             remaining_seconds=float(resp.get("remaining_seconds", 0.0)),
         )
 
-    def unlock(self, password: bytes, totp_code: str) -> SessionStatus:
+    def unlock(self, password: bytes, totp_code: str = "") -> SessionStatus:
         resp = self._request(
             {
                 "cmd": "unlock",

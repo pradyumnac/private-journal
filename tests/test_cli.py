@@ -55,9 +55,10 @@ def test_cli_setup_and_unlock_requires_setup(tmp_path, monkeypatch, capsys):
     assert main(["unlock"]) != 0
     assert "setup" in capsys.readouterr().err.lower()
 
-    # setup initializes vault
+    # setup initializes vault (opt-in TOTP confirmed)
     prompts = iter(["init-pass-123", "init-pass-123"])
     monkeypatch.setattr("click.prompt", lambda text, **kw: next(prompts))
+    monkeypatch.setattr("click.confirm", lambda *a, **kw: True)
     assert main(["setup"]) == 0
     out = capsys.readouterr().out
     secret = ""
@@ -103,6 +104,36 @@ def test_cli_setup_rejects_existing_and_supports_reset_confirm(tmp_path, monkeyp
     out = capsys.readouterr().out
     assert first.totp_secret not in out
     assert "otpauth://totp/" in out
+
+
+# Traceability: Feature "Config Management & Thin CLI (pj)"
+# Scenario: Opt-in TOTP during setup and password-only unlock when disabled
+def test_cli_opt_in_totp_disabled_password_only_unlock(tmp_path, monkeypatch, capsys):
+    xdg_config, _, _ = _setup_cli_env(tmp_path, monkeypatch)
+
+    prompts = iter(["pw-only-123", "pw-only-123"])
+    monkeypatch.setattr("click.prompt", lambda text, **kw: next(prompts))
+    monkeypatch.setattr("click.confirm", lambda *a, **kw: False)
+    assert main(["setup"]) == 0
+    out = capsys.readouterr().out
+    assert "otpauth://" not in out
+
+    cfg = json.loads((xdg_config / "private-journal" / "config.json").read_text(encoding="utf-8"))
+    assert cfg["totp_enabled"] is False
+
+    # Wrong password still rejected
+    monkeypatch.setattr("click.prompt", lambda text, **kw: "wrong-pw")
+    assert main(["unlock"]) != 0
+    capsys.readouterr()
+
+    # Correct password unlocks without TOTP prompt
+    monkeypatch.setattr("click.prompt", lambda text, **kw: "pw-only-123")
+    try:
+        assert main(["unlock"]) == 0
+        assert main(["status"]) == 0
+        assert "unlocked" in capsys.readouterr().out.lower()
+    finally:
+        main(["lock"])
 
 
 # Traceability: Feature "Config Management & Thin CLI (pj)"
