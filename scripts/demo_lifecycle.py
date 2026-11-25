@@ -150,21 +150,15 @@ class DemoRunner:
             self.run_pj(["status"])
             self.run_pj(["search", "--plain"], expect_ok=False)
 
-            # 2. First-run setup + TOTP unlock (using library setup + live TOTP into pj unlock)
+            # 2. First-run setup + TOTP unlock via pj setup and pj unlock
             self.scene(2, 7, "FIRST-RUN SETUP & 2FA TIMED UNLOCK")
-            from private_journal.setup import initialize_vault
+            self._type_line("$ pj setup")
+            totp_secret = self._setup_via_cli(password)
+            self.note(f"TOTP Secret: {totp_secret}")
 
-            self._type_line("$ pj unlock  # (first-run setup: password + TOTP provisioning)")
-            setup_res = initialize_vault(
-                password=password.encode("utf-8"),
-                data_dir=self.xdg_data / "private-journal",
-            )
-            print(f"  Vault initialized at {setup_res.data_dir}")
-            print(f"  TOTP URI: {setup_res.totp_uri}")
-            self.note(f"TOTP Secret: {setup_res.totp_secret}")
-
-            # Unlock via CLI using a live TOTP code (via pty/stdin helper for getpass)
-            totp_code = pyotp.TOTP(setup_res.totp_secret).now()
+            # Unlock via CLI using a live TOTP code
+            totp_code = pyotp.TOTP(totp_secret).now()
+            self._type_line("$ pj unlock")
             self._unlock_via_cli(password, totp_code)
             self.run_pj(["status"])
 
@@ -215,6 +209,28 @@ class DemoRunner:
         finally:
             self.teardown()
             print(f"\n[teardown] Removed sandbox {self.root} (exists={self.root.exists()})")
+
+    def _setup_via_cli(self, password: str) -> str:
+        """Invoke pj setup in the isolated sandbox env without touching host XDG_CONFIG_HOME."""
+        proc = subprocess.run(
+            [sys.executable, "-m", "private_journal.cli", "setup"],
+            env=self.env,
+            input=f"{password}\n{password}\n",
+            text=True,
+            capture_output=True,
+            start_new_session=True,
+            timeout=15,
+            check=False,
+        )
+        if proc.stdout.strip():
+            for line in proc.stdout.strip().splitlines():
+                print(f"  {line}")
+        if proc.returncode != 0:
+            raise RuntimeError(f"setup failed: {proc.stderr}")
+        for line in proc.stdout.splitlines():
+            if line.startswith("TOTP Secret:"):
+                return line.split(":", 1)[1].strip()
+        raise RuntimeError("TOTP Secret not found in pj setup output")
 
     def _unlock_via_cli(self, password: str, totp_code: str) -> None:
         """Invoke pj unlock with password + TOTP without /dev/tty so getpass reads stdin."""
