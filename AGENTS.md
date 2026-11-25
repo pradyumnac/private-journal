@@ -58,6 +58,6 @@ All operations require an active timeout-based `unlock` session, except `unlock`
 
 ## Roadmap
 
-| Feature | Status |
-| --- | --- |
-| No pending items (core roadmap complete) | — |
+| Feature | Type | Status |
+| --- | --- | --- |
+| No pending items (core roadmap complete) | — | — |

@@ -9,7 +9,6 @@ Single-user, 2FA-gated encrypted CLI journal. Entries, metadata, and file names 
 - **No accidental disk leaks:** Notes are edited in sandboxed `nvim` (`-n -i NONE`, `nobackup`/`noundofile`/`noswapfile`) inside `$XDG_RUNTIME_DIR`, then overwritten with zeros and deleted on exit.
 - **Memory protection:** Keys live in `mlock`ed buffers that are zeroized on lock or timeout, with core dumps disabled (`RLIMIT_CORE=0`).
 - **Fast local search:** Full-text, tag, and date-range search runs over a transient in-memory index using `fzf --no-history`—nothing is written to disk.
-- **Local verification:** 31/31 BDD-traceable tests passing across 9 library modules.
 
 ### Lifecycle Walkthrough
 
@@ -58,8 +57,6 @@ pj delete [id_or_prefix] [--yes] # (alias: d, rm) Delete entry (uses fzf if omit
 pj completion bash|zsh|fish      # Generate shell autocompletion script
 ```
 
-`nvim` runs with `-n -i NONE` and `nobackup`/`nowritebackup`/`noundofile`/`noswapfile` on a `0600` file in `$XDG_RUNTIME_DIR`, zero-wiped and deleted on exit.
-
 ### 3. Searching and Listing
 
 `list` is folded into `search`. Search runs against a transient in-memory index (never written to disk) and uses `fzf --no-history`.
@@ -86,16 +83,8 @@ pj config set data_dir ~/vault   # Set custom vault directory
 ## Development
 
 ```bash
-mise run test                    # Run pytest suite (31 tests)
-mise run release                 # Test, build wheel/sdist, tag, and create GitHub Release
-```
-
-## Demo
-
-Run the self-contained ASCII-movie lifecycle demo in an isolated `/tmp` sandbox (setup, 2FA unlock, create, disk inspection, search, view, edit, config, delete, lock, and full teardown):
-
-```bash
-uv run python scripts/demo_lifecycle.py           # Paced demo
-uv run python scripts/demo_lifecycle.py -v        # Verbose crypto/socket details
-uv run python scripts/demo_lifecycle.py -v --fast # Instant output
+mise run test                    # Run pytest suite
+mise run demo                    # Record asciinema cast and render SVG demo
+mise run release                 # Run tests + demo gate, build, tag, and create GitHub Release
+uv run python scripts/demo_lifecycle.py -v --fast  # Run isolated /tmp lifecycle demo
 ```
