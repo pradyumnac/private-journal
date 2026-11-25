@@ -44,8 +44,9 @@
 
 ## CLI Contract
 
-All operations require an active timeout-based `unlock` session, except `unlock`, `lock`, `status`, and QoL flags (`--help`, `--version`).
+All operations require an active timeout-based `unlock` session, except `setup`, `unlock`, `lock`, `status`, and QoL flags (`--help`, `--version`).
 
+- `setup` (`su`) — Initialize vault password + TOTP (`--reset` replaces challenge after confirmation).
 - `unlock` (`ul`) — Verify password + TOTP and start/extend the timed session.
 - `lock` (`lk`) — Lock immediately and wipe session memory.
 - `status` (`st`) — Show lock state and remaining timeout.

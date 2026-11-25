@@ -20,8 +20,11 @@ and
 require an active unlocked session.
 .SH COMMANDS
 .TP
+.B setup [\-\-reset]
+Initialize vault password and Google Authenticator TOTP secret. Rejects existing vaults unless \fB\-\-reset\fR is passed and confirmed.
+.TP
 .B unlock
-Verify password and Google Authenticator TOTP code to start or extend the timed session. Triggers first-run setup if no vault exists.
+Verify password and Google Authenticator TOTP code to start or extend the timed session.
 .TP
 .B lock
 Lock immediately, zeroize key buffers, and stop the session daemon.

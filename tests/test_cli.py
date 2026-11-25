@@ -39,35 +39,62 @@ def test_cli_help_and_version(capsys):
 
 
 # Traceability: Feature "Config Management & Thin CLI (pj)"
-# Scenario: Trigger first-run setup on unlock when no vault exists
-def test_cli_first_run_setup_on_unlock(tmp_path, monkeypatch, capsys):
+# Scenario: Initialize vault via pj setup and require setup before unlock
+def test_cli_setup_and_unlock_requires_setup(tmp_path, monkeypatch, capsys):
     _, xdg_data, _ = _setup_cli_env(tmp_path, monkeypatch)
 
+    # unlock before setup must fail
+    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "init-pass-123")
+    monkeypatch.setattr("builtins.input", lambda _p="": "000000")
+    assert main(["unlock"]) != 0
+    assert "setup" in capsys.readouterr().err.lower()
+
+    # setup initializes vault
     prompts = iter(["init-pass-123", "init-pass-123"])
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _prompt="": next(prompts))
+    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": next(prompts))
+    assert main(["setup"]) == 0
+    out = capsys.readouterr().out
+    secret = ""
+    for token in out.split():
+        if token.startswith("otpauth://"):
+            secret = token.split("secret=")[1].split("&")[0]
+    assert secret
+    assert (xdg_data / "private-journal" / "vault.json").exists()
 
-    captured_secret: list[str] = []
-
-    def fake_input(prompt=""):
-        # Capture secret from printed URI before returning TOTP code
-        out = capsys.readouterr().out
-        for token in out.split():
-            if token.startswith("otpauth://"):
-                secret = token.split("secret=")[1].split("&")[0]
-                captured_secret.append(secret)
-        return pyotp.TOTP(captured_secret[0]).now()
-
-    monkeypatch.setattr("builtins.input", fake_input)
-
+    # unlock now succeeds with password + TOTP
+    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "init-pass-123")
+    monkeypatch.setattr("builtins.input", lambda _p="": pyotp.TOTP(secret).now())
     try:
-        rc = main(["unlock"])
-        assert rc == 0
-        assert (xdg_data / "private-journal" / "vault.json").exists()
-        assert len(captured_secret) == 1
+        assert main(["unlock"]) == 0
         assert main(["status"]) == 0
         assert "unlocked" in capsys.readouterr().out.lower()
     finally:
         main(["lock"])
+
+
+# Traceability: Feature "Config Management & Thin CLI (pj)"
+# Scenario: Reject setup on existing vault unless --reset is confirmed
+def test_cli_setup_rejects_existing_and_supports_reset_confirm(tmp_path, monkeypatch, capsys):
+    _setup_cli_env(tmp_path, monkeypatch)
+    first = initialize_vault(password=b"old-pass-123")
+
+    # setup without --reset must fail
+    assert main(["setup"]) != 0
+    assert "already" in capsys.readouterr().err.lower()
+
+    # setup --reset aborted on decline
+    monkeypatch.setattr("click.confirm", lambda *a, **kw: False)
+    assert main(["setup", "--reset"]) == 0
+    capsys.readouterr()
+
+    # setup --reset confirmed resets challenge (new TOTP secret)
+    monkeypatch.setattr("click.confirm", lambda *a, **kw: True)
+    prompts = iter(["new-pass-456", "new-pass-456"])
+    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": next(prompts))
+    assert main(["su", "--reset"]) == 0
+    out = capsys.readouterr().out
+    assert first.totp_secret not in out
+    assert "otpauth://totp/" in out
 
 
 # Traceability: Feature "Config Management & Thin CLI (pj)"

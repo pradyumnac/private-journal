@@ -34,13 +34,14 @@ uv tool install "git+ssh://git@github.com/pradyumnac/private-journal.git@latest"
 
 ### 1. First-Run Setup and Unlock
 
-All operations except `unlock`, `lock`, `status`, `--help`, and `--version` require an active unlocked session.
+All operations except `setup`, `unlock`, `lock`, `status`, `--help`, and `--version` require an active unlocked session.
 
 ```bash
-pj unlock
+pj setup                         # (alias: su) Initialize password + TOTP (--reset to replace)
+pj unlock                        # (alias: ul) Start timed session
 ```
 
-On the first run, `pj unlock` prompts for a vault password, prints the TOTP secret and `otpauth://` provisioning URI for Google Authenticator, and prompts for your first 6-digit TOTP code.
+`pj setup` prompts for a vault password and prints the TOTP secret and `otpauth://` provisioning URI for Google Authenticator. It rejects re-initialization unless `--reset` is passed and confirmed.
 
 ### 2. Creating, Viewing, Editing, and Deleting Entries
 

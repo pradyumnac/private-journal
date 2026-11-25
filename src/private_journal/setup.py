@@ -36,14 +36,18 @@ class SetupResult:
     totp_uri: str
 
 
-def initialize_vault(password: bytes, data_dir: Path | None = None) -> SetupResult:
+def initialize_vault(
+    password: bytes,
+    data_dir: Path | None = None,
+    reset: bool = False,
+) -> SetupResult:
     """Initialize a new encrypted journal vault and default configuration."""
     if not password:
         raise SetupError("Password must not be empty.")
 
     target_dir = Path(data_dir) if data_dir is not None else get_xdg_data_dir()
     vault_path = target_dir / "vault.json"
-    if vault_path.exists():
+    if vault_path.exists() and not reset:
         raise SetupError(f"Vault already exists at {vault_path}.")
 
     target_dir.mkdir(parents=True, exist_ok=True)

@@ -77,6 +77,7 @@ def _delete_with_confirm(client: SessionClient, entry_id: str, yes: bool) -> Non
 @click.group(
     cls=AliasedGroup,
     aliases={
+        "su": "setup",
         "ul": "unlock",
         "lk": "lock",
         "st": "status",
@@ -98,6 +99,33 @@ def cli(ctx: click.Context) -> None:
     ctx.obj = SessionClient()
 
 
+@cli.command(help="Initialize a new vault with password + TOTP. (alias: su)")
+@click.option("--reset", is_flag=True, help="Reset existing vault password/TOTP challenge after confirmation.")
+def setup(reset: bool) -> None:
+    cfg = load_config()
+    data_dir = Path(cfg["data_dir"])
+    vault_file = data_dir / "vault.json"
+
+    if vault_file.exists():
+        if not reset:
+            raise SetupError(f"Vault already exists at {vault_file}. Use --reset to replace the challenge.")
+        if not click.confirm(
+            f"Vault already exists at {vault_file}. Resetting replaces the password/TOTP challenge and makes existing entries unreadable. Continue?",
+            default=False,
+            err=True,
+        ):
+            return
+
+    pw1 = getpass.getpass("Create vault password: ")
+    pw2 = getpass.getpass("Confirm vault password: ")
+    if pw1 != pw2:
+        raise SetupError("Passwords do not match.")
+    res = initialize_vault(password=pw1.encode("utf-8"), data_dir=data_dir, reset=reset)
+    click.echo(f"Vault initialized at {res.data_dir}")
+    click.echo(f"TOTP Secret: {res.totp_secret}")
+    click.echo(f"TOTP URI:    {res.totp_uri}")
+
+
 @cli.command(help="Verify password + TOTP and start timed session. (alias: ul)")
 @click.pass_obj
 def unlock(client: SessionClient) -> None:
@@ -106,18 +134,9 @@ def unlock(client: SessionClient) -> None:
     vault_file = data_dir / "vault.json"
 
     if not vault_file.exists():
-        pw1 = getpass.getpass("Create vault password: ")
-        pw2 = getpass.getpass("Confirm vault password: ")
-        if pw1 != pw2:
-            raise SetupError("Passwords do not match.")
-        res = initialize_vault(password=pw1.encode("utf-8"), data_dir=data_dir)
-        click.echo(f"Vault initialized at {res.data_dir}")
-        click.echo(f"TOTP Secret: {res.totp_secret}")
-        click.echo(f"TOTP URI:    {res.totp_uri}")
-        password = pw1.encode("utf-8")
-    else:
-        password = getpass.getpass("Password: ").encode("utf-8")
+        raise SetupError("Vault is not initialized. Run 'pj setup' first.")
 
+    password = getpass.getpass("Password: ").encode("utf-8")
     totp_code = input("TOTP code: ").strip()
     status = client.unlock(password=password, totp_code=totp_code)
     click.echo(f"Unlocked for {int(status.remaining_seconds)}s.")
