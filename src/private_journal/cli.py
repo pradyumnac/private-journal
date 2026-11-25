@@ -1,12 +1,14 @@
-"""Thin CLI wrapper for private-journal (pj)."""
+"""Thin Click-based CLI wrapper for private-journal (pj)."""
 
 from __future__ import annotations
 
-import argparse
 import getpass
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+import click
+from click.shell_completion import get_completion_class
 
 from private_journal.config import ConfigError, get_config_value, load_config, set_config_value
 from private_journal.crypto import CryptoError, disable_core_dumps
@@ -17,7 +19,14 @@ from private_journal.editor import (
     edit_entry_with_editor,
     format_entry_view,
 )
-from private_journal.search import SearchError, format_search_lines, search_entries, select_entry_with_fzf
+from private_journal.search import (
+    SearchError,
+    format_search_lines,
+    resolve_entry_id,
+    search_entries,
+    select_entry_action_with_fzf,
+    select_entry_with_fzf,
+)
 from private_journal.setup import SetupError, initialize_vault
 from private_journal.storage import StorageError
 
@@ -26,89 +35,24 @@ def _get_version() -> str:
     try:
         return version("private-journal")
     except PackageNotFoundError:
-        return "0.1.0"
+        return "0.1.1"
 
 
-_COMMAND_ALIASES = {
-    "ul": "unlock",
-    "lk": "lock",
-    "st": "status",
-    "n": "new",
-    "e": "edit",
-    "v": "view",
-    "d": "delete",
-    "rm": "delete",
-    "s": "search",
-    "ls": "search",
-    "cfg": "config",
-}
+class AliasedGroup(click.Group):
+    """Click Group supporting short command aliases."""
 
-_CONFIG_ALIASES = {
-    "g": "get",
-    "s": "set",
-}
+    def __init__(self, *args, aliases: dict[str, str] | None = None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._aliases = aliases or {}
 
-
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="pj",
-        description="Private, single-user, 2FA-gated encrypted CLI journal.",
-        epilog=(
-            "examples:\n"
-            "  pj unlock (ul)                    Start timed session (runs setup on first use)\n"
-            "  pj new (n) --tag work             Create a new entry in sandboxed nvim\n"
-            "  pj search (s, ls) \"argon2\"        Search entries and pick via fzf\n"
-            "  pj view (v) <id>                  Display an entry read-only\n"
-            "  pj edit (e) <id>                  Edit an entry in sandboxed nvim\n"
-            "  pj delete (d, rm) <id>            Delete an entry\n"
-            "  pj status (st) / pj lock (lk)     Check TTL or lock immediately\n"
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    sub.add_parser("unlock", aliases=["ul"], help="Verify password + TOTP and start timed session.")
-    sub.add_parser("lock", aliases=["lk"], help="Lock immediately and wipe session memory.")
-    sub.add_parser("status", aliases=["st"], help="Show lock state and remaining timeout.")
-
-    p_new = sub.add_parser("new", aliases=["n"], help="Create a new journal entry via sandboxed nvim.")
-    p_new.add_argument("--tag", action="append", default=[], help="Tag for the entry (repeatable).")
-
-    p_edit = sub.add_parser("edit", aliases=["e"], help="Edit an existing entry via sandboxed nvim.")
-    p_edit.add_argument("id", help="Entry ID.")
-    p_edit.add_argument("--tag", action="append", default=None, help="Replace entry tags (repeatable).")
-
-    p_view = sub.add_parser("view", aliases=["v"], help="Display an entry read-only.")
-    p_view.add_argument("id", help="Entry ID.")
-
-    p_del = sub.add_parser("delete", aliases=["d", "rm"], help="Delete an entry.")
-    p_del.add_argument("id", help="Entry ID.")
-
-    p_search = sub.add_parser(
-        "search",
-        aliases=["s", "ls"],
-        help="Search/list entries via transient index and fzf.",
-        description="Search unlocked entries in memory. Lists all entries when no query or filter is given.",
-    )
-    p_search.add_argument("query", nargs="?", default=None, help="Full-text query.")
-    p_search.add_argument("--tag", action="append", default=[], help="Filter by tag (repeatable).")
-    p_search.add_argument("--after", default=None, help="Start date (YYYY-MM-DD, UTC).")
-    p_search.add_argument("--before", default=None, help="End date (YYYY-MM-DD, UTC).")
-    mode = p_search.add_mutually_exclusive_group()
-    mode.add_argument("--plain", action="store_true", help="Print matching lines to stdout.")
-    mode.add_argument("--id", action="store_true", help="Print selected entry ID.")
-    mode.add_argument("--edit", action="store_true", help="Open selected entry in nvim.")
-
-    p_cfg = sub.add_parser("config", aliases=["cfg"], help="Read or update configuration (unlock_timeout, data_dir).")
-    cfg_sub = p_cfg.add_subparsers(dest="config_action", required=True)
-    p_cget = cfg_sub.add_parser("get", aliases=["g"], help="Get a config value.")
-    p_cget.add_argument("key", help="Config key (unlock_timeout, data_dir).")
-    p_cset = cfg_sub.add_parser("set", aliases=["s"], help="Set a config value.")
-    p_cset.add_argument("key", help="Config key (unlock_timeout, data_dir).")
-    p_cset.add_argument("value", help="New config value.")
-
-    return parser
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            return cmd
+        target = self._aliases.get(cmd_name)
+        if target is not None:
+            return super().get_command(ctx, target)
+        return None
 
 
 def _require_unlocked(client: SessionClient) -> None:
@@ -116,7 +60,47 @@ def _require_unlocked(client: SessionClient) -> None:
         raise SessionError("Session is locked. Run 'pj unlock' first.")
 
 
-def _handle_unlock(client: SessionClient) -> int:
+def _pick_or_resolve_id(client: SessionClient, entry_id: str | None) -> str | None:
+    if entry_id is not None:
+        return resolve_entry_id(client, entry_id)
+    entries = search_entries(client)
+    return select_entry_with_fzf(entries)
+
+
+def _delete_with_confirm(client: SessionClient, entry_id: str, yes: bool) -> None:
+    if not yes and not click.confirm(f"Delete entry {entry_id}?", default=False, err=True):
+        return
+    client.delete_entry(entry_id)
+    click.echo(f"Deleted {entry_id}")
+
+
+@click.group(
+    cls=AliasedGroup,
+    aliases={
+        "ul": "unlock",
+        "lk": "lock",
+        "st": "status",
+        "n": "new",
+        "e": "edit",
+        "v": "view",
+        "d": "delete",
+        "rm": "delete",
+        "s": "search",
+        "ls": "search",
+        "cfg": "config",
+    },
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help="Private, single-user, 2FA-gated encrypted CLI journal.",
+)
+@click.version_option(version=_get_version(), prog_name="pj")
+@click.pass_context
+def cli(ctx: click.Context) -> None:
+    ctx.obj = SessionClient()
+
+
+@cli.command(help="Verify password + TOTP and start timed session. (alias: ul)")
+@click.pass_obj
+def unlock(client: SessionClient) -> None:
     cfg = load_config()
     data_dir = Path(cfg["data_dir"])
     vault_file = data_dir / "vault.json"
@@ -127,95 +111,192 @@ def _handle_unlock(client: SessionClient) -> int:
         if pw1 != pw2:
             raise SetupError("Passwords do not match.")
         res = initialize_vault(password=pw1.encode("utf-8"), data_dir=data_dir)
-        print(f"Vault initialized at {res.data_dir}")
-        print(f"TOTP Secret: {res.totp_secret}")
-        print(f"TOTP URI:    {res.totp_uri}")
+        click.echo(f"Vault initialized at {res.data_dir}")
+        click.echo(f"TOTP Secret: {res.totp_secret}")
+        click.echo(f"TOTP URI:    {res.totp_uri}")
         password = pw1.encode("utf-8")
     else:
         password = getpass.getpass("Password: ").encode("utf-8")
 
     totp_code = input("TOTP code: ").strip()
     status = client.unlock(password=password, totp_code=totp_code)
-    print(f"Unlocked for {int(status.remaining_seconds)}s.")
-    return 0
+    click.echo(f"Unlocked for {int(status.remaining_seconds)}s.")
+
+
+@cli.command(help="Lock immediately and wipe session memory. (alias: lk)")
+@click.pass_obj
+def lock(client: SessionClient) -> None:
+    client.lock()
+    click.echo("Locked.")
+
+
+@cli.command(help="Show lock state and remaining timeout. (alias: st)")
+@click.pass_obj
+def status(client: SessionClient) -> None:
+    st = client.status()
+    if st.unlocked:
+        click.echo(f"Unlocked ({int(st.remaining_seconds)}s remaining)")
+    else:
+        click.echo("Locked")
+
+
+@cli.command(help="Create a new journal entry via sandboxed nvim. (alias: n)")
+@click.option("--tag", "tags", multiple=True, help="Tag for the entry (repeatable).")
+@click.pass_obj
+def new(client: SessionClient, tags: tuple[str, ...]) -> None:
+    _require_unlocked(client)
+    entry = create_entry_with_editor(client, tags=list(tags))
+    if entry is not None:
+        click.echo(entry.id)
+
+
+@cli.command(help="Edit an entry via sandboxed nvim (uses fzf if ID omitted). (alias: e)")
+@click.argument("entry_id", metavar="[ID]", required=False, default=None)
+@click.option("--tag", "tags", multiple=True, help="Replace entry tags (repeatable).")
+@click.pass_obj
+def edit(client: SessionClient, entry_id: str | None, tags: tuple[str, ...]) -> None:
+    _require_unlocked(client)
+    resolved = _pick_or_resolve_id(client, entry_id)
+    if resolved is None:
+        return
+    tag_list = list(tags) if tags else None
+    entry = edit_entry_with_editor(client, resolved, tags=tag_list)
+    click.echo(entry.id)
+
+
+@cli.command(help="Display an entry read-only (uses fzf if ID omitted). (alias: v)")
+@click.argument("entry_id", metavar="[ID]", required=False, default=None)
+@click.pass_obj
+def view(client: SessionClient, entry_id: str | None) -> None:
+    _require_unlocked(client)
+    resolved = _pick_or_resolve_id(client, entry_id)
+    if resolved is None:
+        return
+    entry = client.load_entry(resolved)
+    click.echo(format_entry_view(entry))
+
+
+@cli.command(help="Delete an entry (uses fzf if ID omitted). (aliases: d, rm)")
+@click.argument("entry_id", metavar="[ID]", required=False, default=None)
+@click.option("-y", "--yes", is_flag=True, help="Skip delete confirmation.")
+@click.pass_obj
+def delete(client: SessionClient, entry_id: str | None, yes: bool) -> None:
+    _require_unlocked(client)
+    resolved = _pick_or_resolve_id(client, entry_id)
+    if resolved is None:
+        return
+    _delete_with_confirm(client, resolved, yes=yes)
+
+
+@cli.command(help="Search/list entries via transient index and fzf. (aliases: s, ls)")
+@click.argument("query", required=False, default=None)
+@click.option("--tag", "tags", multiple=True, help="Filter by tag (repeatable).")
+@click.option("--after", default=None, help="Start date (YYYY-MM-DD, UTC).")
+@click.option("--before", default=None, help="End date (YYYY-MM-DD, UTC).")
+@click.option("--plain", is_flag=True, help="Print matching lines to stdout.")
+@click.option("--id", "id_only", is_flag=True, help="Print selected entry ID.")
+@click.option("--edit", "open_edit", is_flag=True, help="Open selected entry in nvim.")
+@click.option("-y", "--yes", is_flag=True, help="Skip confirmation on Ctrl-D delete.")
+@click.pass_obj
+def search(
+    client: SessionClient,
+    query: str | None,
+    tags: tuple[str, ...],
+    after: str | None,
+    before: str | None,
+    plain: bool,
+    id_only: bool,
+    open_edit: bool,
+    yes: bool,
+) -> None:
+    _require_unlocked(client)
+    matches = search_entries(
+        client,
+        query=query,
+        tags=list(tags),
+        after=after,
+        before=before,
+    )
+    if plain:
+        for line in format_search_lines(matches):
+            click.echo(line)
+        return
+    if id_only:
+        selected = select_entry_with_fzf(matches)
+        if selected is not None:
+            click.echo(selected)
+        return
+    if open_edit:
+        selected = select_entry_with_fzf(matches)
+        if selected is not None:
+            edit_entry_with_editor(client, selected)
+            click.echo(selected)
+        return
+
+    action, selected = select_entry_action_with_fzf(matches)
+    if selected is None or action == "cancel":
+        return
+    if action == "edit":
+        edit_entry_with_editor(client, selected)
+        click.echo(selected)
+    elif action == "delete":
+        _delete_with_confirm(client, selected, yes=yes)
+    else:
+        click.echo(format_entry_view(client.load_entry(selected)))
+
+
+@cli.group(
+    cls=AliasedGroup,
+    aliases={"g": "get", "s": "set"},
+    help="Read or update configuration (unlock_timeout, data_dir). (alias: cfg)",
+)
+def config() -> None:
+    pass
+
+
+@config.command(name="get", help="Get a config value. (alias: g)")
+@click.argument("key")
+@click.pass_obj
+def config_get(client: SessionClient, key: str) -> None:
+    _require_unlocked(client)
+    click.echo(get_config_value(key))
+
+
+@config.command(name="set", help="Set a config value. (alias: s)")
+@click.argument("key")
+@click.argument("value")
+@click.pass_obj
+def config_set(client: SessionClient, key: str, value: str) -> None:
+    _require_unlocked(client)
+    set_config_value(key, value)
+
+
+@cli.command(help="Generate shell completion script for bash, zsh, or fish.")
+@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"], case_sensitive=False))
+def completion(shell: str) -> None:
+    comp_cls = get_completion_class(shell.lower())
+    if comp_cls is None:
+        raise click.ClickException(f"Unsupported shell: {shell}")
+    comp = comp_cls(cli, {}, "pj", "_PJ_COMPLETE")
+    click.echo(comp.source())
 
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for pj."""
     disable_core_dumps()
-    parser = _build_parser()
-    args = parser.parse_args(argv)
-    command = _COMMAND_ALIASES.get(args.command, args.command)
-    client = SessionClient()
-
+    if argv is not None and any(flag in argv for flag in ("-h", "--help", "--version")):
+        cli.main(args=argv, prog_name="pj")
+        return 0
     try:
-        if command == "unlock":
-            return _handle_unlock(client)
-        if command == "lock":
-            client.lock()
-            print("Locked.")
-            return 0
-        if command == "status":
-            st = client.status()
-            if st.unlocked:
-                print(f"Unlocked ({int(st.remaining_seconds)}s remaining)")
-            else:
-                print("Locked")
-            return 0
-
-        _require_unlocked(client)
-
-        if command == "new":
-            entry = create_entry_with_editor(client, tags=args.tag)
-            if entry is not None:
-                print(entry.id)
-            return 0
-        if command == "edit":
-            entry = edit_entry_with_editor(client, args.id, tags=args.tag)
-            print(entry.id)
-            return 0
-        if command == "view":
-            entry = client.load_entry(args.id)
-            print(format_entry_view(entry))
-            return 0
-        if command == "delete":
-            client.delete_entry(args.id)
-            print(f"Deleted {args.id}")
-            return 0
-        if command == "search":
-            matches = search_entries(
-                client,
-                query=args.query,
-                tags=args.tag,
-                after=args.after,
-                before=args.before,
-            )
-            if args.plain:
-                for line in format_search_lines(matches):
-                    print(line)
-                return 0
-            selected_id = select_entry_with_fzf(matches)
-            if selected_id is None:
-                return 0
-            if args.id:
-                print(selected_id)
-            elif args.edit:
-                edit_entry_with_editor(client, selected_id)
-                print(selected_id)
-            else:
-                print(format_entry_view(client.load_entry(selected_id)))
-            return 0
-        if command == "config":
-            cfg_action = _CONFIG_ALIASES.get(args.config_action, args.config_action)
-            if cfg_action == "get":
-                print(get_config_value(args.key))
-            elif cfg_action == "set":
-                set_config_value(args.key, args.value)
-            return 0
-
-        return 1
+        cli.main(args=argv, prog_name="pj", standalone_mode=False)
+        return 0
+    except click.exceptions.Exit as exc:
+        return int(exc.exit_code)
+    except click.ClickException as exc:
+        click.echo(f"Error: {exc.format_message()}", err=True)
+        return int(exc.exit_code)
     except (SessionError, SetupError, CryptoError, StorageError, EditorError, SearchError, ConfigError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        click.echo(f"Error: {exc}", err=True)
         return 1
 
 

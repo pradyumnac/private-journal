@@ -187,7 +187,7 @@ def test_cli_full_entry_workflow(tmp_path, monkeypatch, capsys):
         assert capsys.readouterr().out.strip() == entry_id
 
         # delete
-        assert main(["delete", entry_id]) == 0
+        assert main(["delete", entry_id, "--yes"]) == 0
         capsys.readouterr()
         assert main(["view", entry_id]) != 0
         capsys.readouterr()
@@ -245,7 +245,7 @@ def test_cli_short_aliases(tmp_path, monkeypatch, capsys):
         assert main(["cfg", "s", "unlock_timeout", "20m"]) == 0
         capsys.readouterr()
 
-        assert main(["d", entry_id]) == 0
+        assert main(["d", entry_id, "--yes"]) == 0
         capsys.readouterr()
     finally:
         assert main(["lk"]) == 0

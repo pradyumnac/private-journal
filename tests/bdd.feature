@@ -218,3 +218,28 @@ Feature: Config Management & Thin CLI (pj)
     Given the standalone demo script scripts/demo_lifecycle.py
     When executed with --fast in an isolated tmp sandbox
     Then it exits 0, completes all 7 lifecycle stages, and removes its tmp sandbox
+
+
+Feature: Click CLI, Shell Completion & ID-less Discovery
+
+  Scenario: Resolve entries by unique ID prefix and reject ambiguous prefixes
+    Given an active unlocked session with multiple encrypted entries
+    When the user passes a unique 4-character ID prefix to view, edit, or delete
+    Then the matching entry is resolved and operated on
+    And an ambiguous or unknown prefix fails with a clear error
+
+  Scenario: Launch fzf automatically when view, edit, or delete is called without an ID
+    Given an active unlocked session with existing entries
+    When the user runs pj view, pj edit, or pj delete with no ID argument
+    Then fzf is launched to select an entry
+    And delete prompts for confirmation unless --yes is passed
+
+  Scenario: Support multi-action keybinds in interactive search
+    Given an active unlocked session with matching entries
+    When the user selects an entry in fzf with Enter, Ctrl-E, or Ctrl-D
+    Then Enter displays the entry, Ctrl-E opens it in sandboxed nvim, and Ctrl-D deletes it after confirmation
+
+  Scenario: Generate shell completion scripts for bash, zsh, and fish
+    Given the click-based pj CLI
+    When the user runs pj completion bash, zsh, or fish
+    Then the corresponding click shell completion script is printed to stdout

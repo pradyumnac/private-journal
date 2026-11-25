@@ -67,6 +67,60 @@ def format_search_lines(entries: list[JournalEntry]) -> list[str]:
     return lines
 
 
+def resolve_entry_id(client: SessionClient, prefix: str) -> str:
+    """Resolve a full entry ID or unique ID prefix."""
+    needle = prefix.strip().lower()
+    if not needle:
+        raise SearchError("Entry ID must not be empty.")
+    entries = client.list_entries()
+    matches = [e.id for e in entries if e.id.lower().startswith(needle)]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise SearchError(f"Ambiguous entry ID prefix '{prefix}' ({len(matches)} matches).")
+    raise SearchError(f"No entry found matching '{prefix}'.")
+
+
+def select_entry_action_with_fzf(entries: list[JournalEntry]) -> tuple[str, str | None]:
+    """Launch fzf with multi-action keybinds (Enter=view, Ctrl-E=edit, Ctrl-D=delete)."""
+    if not entries:
+        return "cancel", None
+    lines = format_search_lines(entries)
+    cmd = [
+        "fzf",
+        "--no-history",
+        "--delimiter=\t",
+        "--with-nth=2..",
+        "--expect=ctrl-e,ctrl-d",
+        "--header=Enter: view | Ctrl-E: edit | Ctrl-D: delete",
+    ]
+    result = subprocess.run(
+        cmd,
+        input="\n".join(lines) + "\n",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode in (1, 130):
+        return "cancel", None
+    if result.returncode != 0:
+        raise SearchError(f"fzf exited with status {result.returncode}.")
+    out_lines = result.stdout.splitlines()
+    if not out_lines:
+        return "cancel", None
+    if len(out_lines) == 1:
+        key = ""
+        selected = out_lines[0].strip()
+    else:
+        key = out_lines[0].strip().lower()
+        selected = out_lines[1].strip()
+    if not selected:
+        return "cancel", None
+    entry_id = selected.split("\t", 1)[0]
+    action = {"ctrl-e": "edit", "ctrl-d": "delete"}.get(key, "view")
+    return action, entry_id
+
+
 def select_entry_with_fzf(entries: list[JournalEntry]) -> str | None:
     """Launch fzf with --no-history and return the selected entry ID, or None."""
     if not entries:

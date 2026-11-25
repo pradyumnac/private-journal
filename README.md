@@ -45,13 +45,17 @@ On the first run, `pj unlock` prompts for a vault password, prints the TOTP secr
 
 ### 2. Creating, Viewing, Editing, and Deleting Entries
 
-`pj new` prints the new entry `<id>` on save. You can also get an `<id>` from `pj search --id` or `pj search --plain`, or skip IDs altogether by using `pj search` (opens `view`) and `pj search --edit` (opens `edit`).
+`pj new` prints the new entry `<id>` on save, though you rarely need to type it:
+- `pj view`, `pj edit`, and `pj delete` launch `fzf` automatically when `<id>` is omitted, and accept any unique ID prefix (e.g., `pj v d00c`).
+- `pj search` supports `Enter` (view), `Ctrl-E` (edit), and `Ctrl-D` (delete) directly inside `fzf`.
+- `pj delete` prompts for confirmation unless `--yes` (`-y`) is passed.
 
 ```bash
 pj new --tag work --tag notes   # (alias: n)  Create an entry in sandboxed nvim (prints <id>)
-pj view <id>                     # (alias: v)  Display decrypted entry read-only
-pj edit <id>                     # (alias: e)  Edit entry in sandboxed nvim
-pj delete <id>                   # (alias: d, rm) Delete encrypted entry
+pj view [id_or_prefix]           # (alias: v)  Display entry (uses fzf if omitted)
+pj edit [id_or_prefix]           # (alias: e)  Edit entry (uses fzf if omitted)
+pj delete [id_or_prefix] [--yes] # (alias: d, rm) Delete entry (uses fzf if omitted)
+pj completion bash|zsh|fish      # Generate shell autocompletion script
 ```
 
 `nvim` runs with `-n -i NONE` and `nobackup`/`nowritebackup`/`noundofile`/`noswapfile` on a `0600` file in `$XDG_RUNTIME_DIR`, zero-wiped and deleted on exit.

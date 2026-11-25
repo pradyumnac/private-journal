@@ -204,7 +204,7 @@ class DemoRunner:
             self.run_pj(["config", "get", "unlock_timeout"])
             self.run_pj(["config", "set", "unlock_timeout", "30m"])
             self.run_pj(["config", "get", "unlock_timeout"])
-            self.run_pj(["delete", entry_id])
+            self.run_pj(["delete", entry_id, "--yes"])
             self.run_pj(["search", "--plain"])
 
             # 7. Lock & teardown
