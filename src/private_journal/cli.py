@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import getpass
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -39,11 +38,14 @@ def _get_version() -> str:
 
 
 class AliasedGroup(click.Group):
-    """Click Group supporting short command aliases."""
+    """Click Group supporting short command aliases displayed in --help."""
 
     def __init__(self, *args, aliases: dict[str, str] | None = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._aliases = aliases or {}
+        self._reverse_aliases: dict[str, list[str]] = {}
+        for alias, target in self._aliases.items():
+            self._reverse_aliases.setdefault(target, []).append(alias)
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         cmd = super().get_command(ctx, cmd_name)
@@ -53,6 +55,22 @@ class AliasedGroup(click.Group):
         if target is not None:
             return super().get_command(ctx, target)
         return None
+
+    def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        commands = []
+        for subcommand in self.list_commands(ctx):
+            cmd = self.get_command(ctx, subcommand)
+            if cmd is None or cmd.hidden:
+                continue
+            aliases = self._reverse_aliases.get(subcommand, [])
+            label = f"{subcommand} ({', '.join(aliases)})" if aliases else subcommand
+            commands.append((label, cmd))
+
+        if commands:
+            limit = formatter.width - 6 - max(len(label) for label, _ in commands)
+            rows = [(label, cmd.get_short_help_str(limit=max(limit, 20))) for label, cmd in commands]
+            with formatter.section("Commands"):
+                formatter.write_dl(rows)
 
 
 def _require_unlocked(client: SessionClient) -> None:
@@ -92,6 +110,16 @@ def _delete_with_confirm(client: SessionClient, entry_id: str, yes: bool) -> Non
     },
     context_settings={"help_option_names": ["-h", "--help"]},
     help="Private, single-user, 2FA-gated encrypted CLI journal.",
+    epilog=(
+        "\b\n"
+        "Examples:\n"
+        "  pj setup (su)                   Initialize vault password + TOTP\n"
+        "  pj unlock (ul)                  Start timed 2FA session\n"
+        "  pj new (n) --tag work           Create a new entry in sandboxed nvim\n"
+        "  pj search (s, ls) \"argon2\"      Search entries and pick via fzf\n"
+        "  pj view (v) / edit (e) / d      Act on entry (uses fzf if ID omitted)\n"
+        "  pj status (st) / pj lock (lk)   Check TTL or lock immediately"
+    ),
 )
 @click.version_option(version=_get_version(), prog_name="pj")
 @click.pass_context
@@ -116,8 +144,8 @@ def setup(reset: bool) -> None:
         ):
             return
 
-    pw1 = getpass.getpass("Create vault password: ")
-    pw2 = getpass.getpass("Confirm vault password: ")
+    pw1 = click.prompt("Create vault password", hide_input=True, err=True)
+    pw2 = click.prompt("Confirm vault password", hide_input=True, err=True)
     if pw1 != pw2:
         raise SetupError("Passwords do not match.")
     res = initialize_vault(password=pw1.encode("utf-8"), data_dir=data_dir, reset=reset)
@@ -136,8 +164,8 @@ def unlock(client: SessionClient) -> None:
     if not vault_file.exists():
         raise SetupError("Vault is not initialized. Run 'pj setup' first.")
 
-    password = getpass.getpass("Password: ").encode("utf-8")
-    totp_code = input("TOTP code: ").strip()
+    password = click.prompt("Password", hide_input=True, err=True).encode("utf-8")
+    totp_code = click.prompt("TOTP code", err=True).strip()
     status = client.unlock(password=password, totp_code=totp_code)
     click.echo(f"Unlocked for {int(status.remaining_seconds)}s.")
 
@@ -149,18 +177,18 @@ def lock(client: SessionClient) -> None:
     click.echo("Locked.")
 
 
-@cli.command(help="Show lock state and remaining timeout. (alias: st)")
+@cli.command(help="Show lock state and remaining timeout.")
 @click.pass_obj
 def status(client: SessionClient) -> None:
     st = client.status()
     if st.unlocked:
-        click.echo(f"Unlocked ({int(st.remaining_seconds)}s remaining)")
+        click.secho(f"Unlocked ({int(st.remaining_seconds)}s remaining)", fg="green")
     else:
         data_dir = Path(load_config()["data_dir"])
         if not (data_dir / "vault.json").exists():
-            click.echo("Not initialized (run 'pj setup')")
+            click.secho("Not initialized (run 'pj setup')", fg="cyan")
         else:
-            click.echo("Locked")
+            click.secho("Locked", fg="yellow")
 
 
 @cli.command(help="Create a new journal entry via sandboxed nvim. (alias: n)")
@@ -316,10 +344,10 @@ def main(argv: list[str] | None = None) -> int:
     except click.exceptions.Exit as exc:
         return int(exc.exit_code)
     except click.ClickException as exc:
-        click.echo(f"Error: {exc.format_message()}", err=True)
+        click.secho(f"Error: {exc.format_message()}", fg="red", err=True)
         return int(exc.exit_code)
     except (SessionError, SetupError, CryptoError, StorageError, EditorError, SearchError, ConfigError) as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.secho(f"Error: {exc}", fg="red", err=True)
         return 1
 
 

@@ -28,7 +28,10 @@ def test_cli_help_and_version(capsys):
     with pytest.raises(SystemExit) as exc_help:
         main(["--help"])
     assert exc_help.value.code == 0
-    assert "pj" in capsys.readouterr().out
+    help_out = capsys.readouterr().out
+    assert "pj" in help_out
+    assert "unlock (ul)" in help_out
+    assert "Examples:" in help_out
 
     with pytest.raises(SystemExit) as exc_ver:
         main(["--version"])
@@ -48,14 +51,13 @@ def test_cli_setup_and_unlock_requires_setup(tmp_path, monkeypatch, capsys):
     assert "not initialized" in capsys.readouterr().out.lower()
 
     # unlock before setup must fail
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "init-pass-123")
-    monkeypatch.setattr("builtins.input", lambda _p="": "000000")
+    monkeypatch.setattr("click.prompt", lambda text, **kw: "init-pass-123" if kw.get("hide_input") else "000000")
     assert main(["unlock"]) != 0
     assert "setup" in capsys.readouterr().err.lower()
 
     # setup initializes vault
     prompts = iter(["init-pass-123", "init-pass-123"])
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": next(prompts))
+    monkeypatch.setattr("click.prompt", lambda text, **kw: next(prompts))
     assert main(["setup"]) == 0
     out = capsys.readouterr().out
     secret = ""
@@ -66,8 +68,10 @@ def test_cli_setup_and_unlock_requires_setup(tmp_path, monkeypatch, capsys):
     assert (xdg_data / "private-journal" / "vault.json").exists()
 
     # unlock now succeeds with password + TOTP
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "init-pass-123")
-    monkeypatch.setattr("builtins.input", lambda _p="": pyotp.TOTP(secret).now())
+    monkeypatch.setattr(
+        "click.prompt",
+        lambda text, **kw: "init-pass-123" if kw.get("hide_input") else pyotp.TOTP(secret).now(),
+    )
     try:
         assert main(["unlock"]) == 0
         assert main(["status"]) == 0
@@ -94,7 +98,7 @@ def test_cli_setup_rejects_existing_and_supports_reset_confirm(tmp_path, monkeyp
     # setup --reset confirmed resets challenge (new TOTP secret)
     monkeypatch.setattr("click.confirm", lambda *a, **kw: True)
     prompts = iter(["new-pass-456", "new-pass-456"])
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": next(prompts))
+    monkeypatch.setattr("click.prompt", lambda text, **kw: next(prompts))
     assert main(["su", "--reset"]) == 0
     out = capsys.readouterr().out
     assert first.totp_secret not in out
@@ -128,8 +132,10 @@ def test_cli_config_get_and_set(tmp_path, monkeypatch, capsys):
     xdg_config, _, _ = _setup_cli_env(tmp_path, monkeypatch)
     res = initialize_vault(password=b"cfg-pass-123")
 
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "cfg-pass-123")
-    monkeypatch.setattr("builtins.input", lambda _p="": pyotp.TOTP(res.totp_secret).now())
+    monkeypatch.setattr(
+        "click.prompt",
+        lambda text, **kw: "cfg-pass-123" if kw.get("hide_input") else pyotp.TOTP(res.totp_secret).now(),
+    )
 
     try:
         assert main(["unlock"]) == 0
@@ -161,8 +167,10 @@ def test_cli_full_entry_workflow(tmp_path, monkeypatch, capsys):
     _setup_cli_env(tmp_path, monkeypatch)
     res = initialize_vault(password=b"flow-pass-123")
 
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "flow-pass-123")
-    monkeypatch.setattr("builtins.input", lambda _p="": pyotp.TOTP(res.totp_secret).now())
+    monkeypatch.setattr(
+        "click.prompt",
+        lambda text, **kw: "flow-pass-123" if kw.get("hide_input") else pyotp.TOTP(res.totp_secret).now(),
+    )
 
     assert main(["unlock"]) == 0
     capsys.readouterr()
@@ -241,8 +249,10 @@ def test_cli_short_aliases(tmp_path, monkeypatch, capsys):
     _setup_cli_env(tmp_path, monkeypatch)
     res = initialize_vault(password=b"alias-pass-123")
 
-    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "alias-pass-123")
-    monkeypatch.setattr("builtins.input", lambda _p="": pyotp.TOTP(res.totp_secret).now())
+    monkeypatch.setattr(
+        "click.prompt",
+        lambda text, **kw: "alias-pass-123" if kw.get("hide_input") else pyotp.TOTP(res.totp_secret).now(),
+    )
 
     assert main(["ul"]) == 0
     capsys.readouterr()
