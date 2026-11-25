@@ -235,8 +235,16 @@ class DemoRunner:
             raise RuntimeError(f"unlock failed: {proc.stderr}")
 
 
-def render_cast_to_svg(cast_path: Path, svg_path: Path, cols: int = 76, rows: int = 24) -> None:
+def render_cast_to_svg(
+    cast_path: Path,
+    svg_path: Path,
+    cols: int = 76,
+    rows: int = 24,
+    speed: float = 0.75,
+) -> None:
     """Render an asciinema .cast file (v2/v3) into an animated terminal SVG."""
+    if speed <= 0:
+        raise ValueError("speed must be positive")
     raw_lines = [ln for ln in cast_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     if not raw_lines:
         raise RuntimeError(f"Empty cast file: {cast_path}")
@@ -270,8 +278,11 @@ def render_cast_to_svg(cast_path: Path, svg_path: Path, cols: int = 76, rows: in
             last_captured = elapsed
 
     final_visible = [ln[:cols] for ln in screen_lines[-rows:]]
-    total_dur = max(elapsed + 2.0, 2.0)
-    frames.append((elapsed + 0.05, final_visible))
+    scale = 1.0 / speed
+    scaled_frames = [(t * scale, vis) for t, vis in frames]
+    total_dur = max(elapsed * scale + 2.0, 2.0)
+    scaled_frames.append((elapsed * scale + 0.05, final_visible))
+    frames = scaled_frames
 
     char_w = 8.4
     line_h = 18
