@@ -18,15 +18,27 @@ Replay locally with `asciinema play docs/demo.cast`, or regenerate with `mise ru
 
 ## Installation
 
-Install the latest release with `pip`, `uv`, `pipx`, or `mise`:
+Direct wheel from GitHub Releases (no cloning):
 
 ```bash
-# Direct wheel from GitHub Releases (no cloning):
 pip install "https://github.com/pradyumnac/private-journal/releases/download/v0.1.2/private_journal-0.1.2-py3-none-any.whl"
+```
 
-# Isolated CLI install (floating @latest release tag):
+Using `uv`:
+
+```bash
 uv tool install "git+https://github.com/pradyumnac/private-journal.git@latest"
+```
+
+Using `pipx`:
+
+```bash
 pipx install "git+https://github.com/pradyumnac/private-journal.git@latest"
+```
+
+Using `mise`:
+
+```bash
 mise use -g "pipx:git+https://github.com/pradyumnac/private-journal@latest"
 ```
 
