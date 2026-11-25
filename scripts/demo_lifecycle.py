@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -15,6 +17,8 @@ import time
 from pathlib import Path
 
 import pyotp
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 
 
 class DemoRunner:
@@ -231,11 +235,131 @@ class DemoRunner:
             raise RuntimeError(f"unlock failed: {proc.stderr}")
 
 
+def render_cast_to_svg(cast_path: Path, svg_path: Path, cols: int = 76, rows: int = 24) -> None:
+    """Render an asciinema .cast file (v2/v3) into an animated terminal SVG."""
+    raw_lines = [ln for ln in cast_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not raw_lines:
+        raise RuntimeError(f"Empty cast file: {cast_path}")
+    header = json.loads(raw_lines[0])
+    is_v3 = int(header.get("version", 2)) >= 3
+
+    frames: list[tuple[float, list[str]]] = []
+    screen_lines: list[str] = [""]
+    elapsed = 0.0
+    last_captured = -1.0
+
+    for line in raw_lines[1:]:
+        ev = json.loads(line)
+        t_val, ev_type, text = float(ev[0]), ev[1], str(ev[2])
+        elapsed = (elapsed + t_val) if is_v3 else t_val
+        if ev_type != "o":
+            continue
+        cleaned = _ANSI_RE.sub("", text).replace("\r\n", "\n").replace("\r", "\n")
+        for ch in cleaned:
+            if ch == "\n":
+                screen_lines.append("")
+            elif ch == "\b":
+                if screen_lines[-1]:
+                    screen_lines[-1] = screen_lines[-1][:-1]
+            else:
+                screen_lines[-1] += ch
+        # Sample frames at >= 0.08s intervals to keep SVG compact and smooth
+        if elapsed - last_captured >= 0.08:
+            visible = [ln[:cols] for ln in screen_lines[-rows:]]
+            frames.append((elapsed, visible))
+            last_captured = elapsed
+
+    final_visible = [ln[:cols] for ln in screen_lines[-rows:]]
+    total_dur = max(elapsed + 2.0, 2.0)
+    frames.append((elapsed + 0.05, final_visible))
+
+    char_w = 8.4
+    line_h = 18
+    pad_x = 18
+    pad_y = 42
+    width = int(cols * char_w + pad_x * 2)
+    height = int(rows * line_h + pad_y + 18)
+
+    css_rules: list[str] = []
+    frame_groups: list[str] = []
+    for idx, (t_start, vis) in enumerate(frames):
+        t_end = frames[idx + 1][0] if idx + 1 < len(frames) else total_dur
+        p_start = (t_start / total_dur) * 100.0
+        p_end = (t_end / total_dur) * 100.0
+        anim_name = f"f{idx}"
+        if idx == len(frames) - 1:
+            css_rules.append(
+                f"@keyframes {anim_name}{{0%,{p_start:.3f}%{{opacity:0}}{p_start + 0.001:.3f}%,100%{{opacity:1}}}}"
+            )
+        else:
+            css_rules.append(
+                f"@keyframes {anim_name}{{0%,{p_start:.3f}%{{opacity:0}}"
+                f"{p_start + 0.001:.3f}%,{p_end:.3f}%{{opacity:1}}"
+                f"{p_end + 0.001:.3f}%,100%{{opacity:0}}}}"
+            )
+        tspans = []
+        for r_idx, ln in enumerate(vis):
+            y = pad_y + r_idx * line_h
+            color = "#7ee787" if ln.startswith("$ ") else ("#79c0ff" if ln.startswith("| [") else "#e6edf3")
+            tspans.append(
+                f'<text x="{pad_x}" y="{y}" fill="{color}">{html.escape(ln)}</text>'
+            )
+        frame_groups.append(
+            f'<g style="opacity:0;animation:{anim_name} {total_dur:.2f}s infinite">{"".join(tspans)}</g>'
+        )
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'width="{width}" height="{height}" role="img" aria-label="private-journal lifecycle demo">\n'
+        f"<style>\n"
+        f'  text {{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; white-space: pre; }}\n'
+        f"  {''.join(css_rules)}\n"
+        f"</style>\n"
+        f'<rect width="{width}" height="{height}" rx="10" fill="#0d1117"/>\n'
+        f'<rect width="{width}" height="28" rx="10" fill="#161b22"/>\n'
+        f'<circle cx="18" cy="14" r="5" fill="#ff5f56"/>\n'
+        f'<circle cx="36" cy="14" r="5" fill="#ffbd2e"/>\n'
+        f'<circle cx="54" cy="14" r="5" fill="#27c93f"/>\n'
+        f'<text x="{width // 2}" y="18" text-anchor="middle" fill="#8b949e">pj — private-journal lifecycle</text>\n'
+        f"{''.join(frame_groups)}\n"
+        f"</svg>\n"
+    )
+    svg_path.parent.mkdir(parents=True, exist_ok=True)
+    svg_path.write_text(svg, encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run full private-journal ASCII-movie lifecycle demo.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show extra cryptographic and socket details.")
     parser.add_argument("--fast", action="store_true", help="Disable typewriter pacing delays.")
+    parser.add_argument("--record-cast", type=Path, default=None, help="Record session to asciinema .cast via mise asciinema.")
+    parser.add_argument("--render-svg", type=Path, default=None, help="Render recorded .cast to an animated SVG.")
     args = parser.parse_args()
+
+    if args.record_cast is not None:
+        args.record_cast.parent.mkdir(parents=True, exist_ok=True)
+        inner_cmd = f"{sys.executable} {Path(__file__).resolve()}"
+        if args.verbose:
+            inner_cmd += " -v"
+        if args.fast:
+            inner_cmd += " --fast"
+        subprocess.run(
+            [
+                "asciinema",
+                "rec",
+                "--overwrite",
+                "--window-size",
+                "76x24",
+                "--command",
+                inner_cmd,
+                str(args.record_cast),
+            ],
+            check=True,
+        )
+        if args.render_svg is not None:
+            render_cast_to_svg(args.record_cast, args.render_svg)
+        return 0
+
     DemoRunner(verbose=args.verbose, fast=args.fast).play()
     return 0
 

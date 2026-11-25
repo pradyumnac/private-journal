@@ -1,10 +1,15 @@
 [tools]
 python = "latest"
 git-cliff = "latest"
+"aqua:asciinema/asciinema" = "latest"
 
 [tasks.test]
 description = "Run full test suite via uv"
 run = "uv run pytest -v"
+
+[tasks.demo]
+description = "Record asciinema .cast and render animated SVG lifecycle demo"
+run = "uv run python scripts/demo_lifecycle.py --record-cast docs/demo.cast --render-svg docs/demo.svg"
 
 [tasks.release]
 description = "Run tests, verify demo output, build wheel/sdist, tag, and publish GitHub Release"
