@@ -189,6 +189,8 @@ Feature: Config Management & Thin CLI (pj)
 
   Scenario: Initialize vault via pj setup and require setup before unlock
     Given no initialized vault exists
+    When the user runs pj status before setup
+    Then status reports Not initialized (run 'pj setup')
     When the user runs pj unlock before setup
     Then unlock fails with an error instructing the user to run pj setup
     When the user runs pj setup and completes password prompts

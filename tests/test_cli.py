@@ -43,6 +43,10 @@ def test_cli_help_and_version(capsys):
 def test_cli_setup_and_unlock_requires_setup(tmp_path, monkeypatch, capsys):
     _, xdg_data, _ = _setup_cli_env(tmp_path, monkeypatch)
 
+    # status before setup must report Not initialized
+    assert main(["status"]) == 0
+    assert "not initialized" in capsys.readouterr().out.lower()
+
     # unlock before setup must fail
     monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "init-pass-123")
     monkeypatch.setattr("builtins.input", lambda _p="": "000000")

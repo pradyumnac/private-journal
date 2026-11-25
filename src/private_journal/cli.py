@@ -156,7 +156,11 @@ def status(client: SessionClient) -> None:
     if st.unlocked:
         click.echo(f"Unlocked ({int(st.remaining_seconds)}s remaining)")
     else:
-        click.echo("Locked")
+        data_dir = Path(load_config()["data_dir"])
+        if not (data_dir / "vault.json").exists():
+            click.echo("Not initialized (run 'pj setup')")
+        else:
+            click.echo("Locked")
 
 
 @cli.command(help="Create a new journal entry via sandboxed nvim. (alias: n)")

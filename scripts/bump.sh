@@ -11,8 +11,9 @@ fi
 uv version --bump "$PART"
 VER=$(uv version --short)
 sed -i -E "s/\"private-journal [0-9]+\.[0-9]+\.[0-9]+\"/\"private-journal ${VER}\"/" man/man1/pj.1
+sed -i -E "s/v[0-9]+\.[0-9]+\.[0-9]+\/private_journal-[0-9]+\.[0-9]+\.[0-9]+/v${VER}\/private_journal-${VER}/g" README.md
 uv lock
 
-git add pyproject.toml uv.lock man/man1/pj.1
+git add pyproject.toml uv.lock man/man1/pj.1 README.md
 git commit -m "Bump version to ${VER}"
 git push origin main
