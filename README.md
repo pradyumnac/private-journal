@@ -21,7 +21,7 @@ Replay locally with `asciinema play docs/demo.cast`, or regenerate with `mise ru
 Direct wheel from GitHub Releases (no cloning):
 
 ```bash
-pip install "https://github.com/pradyumnac/private-journal/releases/download/v0.1.2/private_journal-0.1.2-py3-none-any.whl"
+pip install "https://github.com/pradyumnac/private-journal/releases/download/v0.1.3/private_journal-0.1.3-py3-none-any.whl"
 ```
 
 Using `uv`:
