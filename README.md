@@ -4,11 +4,12 @@ Single-user, 2FA-gated encrypted CLI journal. Entries, metadata, and file names 
 
 ## Overview
 
-- **Encrypted at rest:** Argon2id Master Key, HKDF per-file subkeys, ChaCha20-Poly1305 AEAD, HMAC-SHA256 opaque filenames, `0600` files.
-- **2FA unlock:** Password + Google Authenticator TOTP (`valid_window=1`, replay-checked) via a local `0600` Unix socket daemon (15m default TTL).
-- **Memory & editor safety:** `mlock`ed key buffer, in-place zeroization, `RLIMIT_CORE=0`, sandboxed `nvim` (`-n -i NONE`, `nobackup`/`noundofile`/`noswapfile`) in `$XDG_RUNTIME_DIR`.
-- **Transient search:** In-memory full-text, tag, and date search via `fzf --no-history`.
-- **Local stats:** 31/31 BDD-traceable tests passing across 9 library modules.
+- **Private by default:** Every note, tag, timestamp, and filename is encrypted on disk (`Argon2id` Master Key, `HKDF-SHA256` per-file subkeys, `ChaCha20-Poly1305` AEAD, `HMAC-SHA256` filenames, `0600` permissions).
+- **Two-factor unlock:** Sessions require both your password and a Google Authenticator `TOTP` code (`valid_window=1`, replay-checked), held in a local `0600` Unix-socket daemon with a 15-minute default timeout.
+- **No accidental disk leaks:** Notes are edited in sandboxed `nvim` (`-n -i NONE`, `nobackup`/`noundofile`/`noswapfile`) inside `$XDG_RUNTIME_DIR`, then overwritten with zeros and deleted on exit.
+- **Memory protection:** Keys live in `mlock`ed buffers that are zeroized on lock or timeout, with core dumps disabled (`RLIMIT_CORE=0`).
+- **Fast local search:** Full-text, tag, and date-range search runs over a transient in-memory index using `fzf --no-history`—nothing is written to disk.
+- **Local verification:** 31/31 BDD-traceable tests passing across 9 library modules.
 
 ## Installation
 
