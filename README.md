@@ -79,3 +79,13 @@ pj config set data_dir ~/vault   # Set custom vault directory
 mise run test                    # Run pytest suite (31 tests)
 mise run release                 # Test, build wheel/sdist, tag, and create GitHub Release
 ```
+
+## Demo
+
+Run the self-contained ASCII-movie lifecycle demo in an isolated `/tmp` sandbox (setup, 2FA unlock, create, disk inspection, search, view, edit, config, delete, lock, and full teardown):
+
+```bash
+uv run python scripts/demo_lifecycle.py           # Paced demo
+uv run python scripts/demo_lifecycle.py -v        # Verbose crypto/socket details
+uv run python scripts/demo_lifecycle.py -v --fast # Instant output
+```
