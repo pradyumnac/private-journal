@@ -22,13 +22,13 @@ Replay locally with `asciinema play docs/demo.cast`, or regenerate with `mise ru
 Install from the private GitHub repository using SSH or a configured Git credential helper:
 
 ```bash
-pip install "git+ssh://git@github.com/pradyumnac/private-journal.git@v0.1.0"
+pip install "git+ssh://git@github.com/pradyumnac/private-journal.git@v0.1.1"
 ```
 
 Or install as an isolated CLI tool with `uv`:
 
 ```bash
-uv tool install "git+ssh://git@github.com/pradyumnac/private-journal.git@v0.1.0"
+uv tool install "git+ssh://git@github.com/pradyumnac/private-journal.git@v0.1.1"
 ```
 
 ## User Documentation
