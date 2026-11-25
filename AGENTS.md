@@ -2,7 +2,7 @@
 
 ## Documentation & Scope
 
-- `AGENTS.md` is the only markdown file in this setup. Do not create other `.md` files.
+- `AGENTS.md` and `README.md` are the only markdown files in this setup. Do not create other `.md` files.
 - Keep all writing minimal, understated, and clear.
 - Resist scope creep strictly. Polish the core workflow only.
 
