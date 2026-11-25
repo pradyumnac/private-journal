@@ -33,7 +33,9 @@ def test_cli_help_and_version(capsys):
     with pytest.raises(SystemExit) as exc_ver:
         main(["--version"])
     assert exc_ver.value.code == 0
-    assert "0.1.1" in capsys.readouterr().out
+    from private_journal.cli import _get_version
+
+    assert _get_version() in capsys.readouterr().out
 
 
 # Traceability: Feature "Config Management & Thin CLI (pj)"
