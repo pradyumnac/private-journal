@@ -1,7 +1,8 @@
 [project]
 name = "private-journal"
 version = "0.1.0"
-description = "Add your description here"
+description = "Single-user, 2FA-gated encrypted CLI journal with sandboxed nvim and transient search"
+license = "MIT"
 authors = [
     { name = "Pradyumna Chatterjee", email = "chatterjee.pra@gmail.com" }
 ]
@@ -10,6 +11,9 @@ dependencies = [
     "cryptography>=50.0.2",
     "pyotp>=2.12.1",
 ]
+
+[project.urls]
+Repository = "https://github.com/pradyumnac/private-journal"
 
 [project.scripts]
 pj = "private_journal.cli:main"

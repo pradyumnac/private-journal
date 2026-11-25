@@ -10,7 +10,9 @@
 
 - Private, single-user, CLI-only encrypted journal.
 - Single CLI entry point: `pj` (`src/private_journal/`).
-- Tooling: `mise` (`mise.toml`) for version pinning, `uv` for dependency management.
+- Tooling: `mise` (`mise.toml`) for version pinning and tasks (`mise run test`, `mise run release`), `uv` for dependency management and packaging (`uv build`).
+- Release: Build `pip`-installable wheel and sdist with `uv build` and distribute via tagged GitHub Releases (`v*`, `gh release create`) with `git-cliff` release notes (do not create `CHANGELOG.md`). Do not upload to PyPI.
+- CI & Hooks: No GitHub Actions/CI executions. Pre-commit hook (`.githooks/pre-commit`) runs `uv run pytest -q`.
 - Runtime: Python, `cryptography`, `pyotp`.
 - External tools: `nvim` (editor), `fzf` (interactive search/list).
 

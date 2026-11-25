@@ -1,2 +1,21 @@
 [tools]
 python = "latest"
+git-cliff = "latest"
+
+[tasks.test]
+description = "Run full test suite via uv"
+run = "uv run pytest -v"
+
+[tasks.release]
+description = "Build wheel/sdist, tag, generate changelog, and publish GitHub Release"
+run = """
+set -euo pipefail
+uv run pytest -v
+rm -rf dist
+uv build
+VER=$(uv version --short)
+TAG="v${VER}"
+git tag -a "$TAG" -m "Release $TAG"
+git push origin "$TAG"
+git-cliff --tag "$TAG" --unreleased --strip header | gh release create "$TAG" dist/* --title "$TAG" --notes-file -
+"""
