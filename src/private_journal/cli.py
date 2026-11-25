@@ -29,43 +29,65 @@ def _get_version() -> str:
         return "0.1.0"
 
 
+_COMMAND_ALIASES = {
+    "ul": "unlock",
+    "lk": "lock",
+    "st": "status",
+    "n": "new",
+    "e": "edit",
+    "v": "view",
+    "d": "delete",
+    "rm": "delete",
+    "s": "search",
+    "ls": "search",
+    "cfg": "config",
+}
+
+_CONFIG_ALIASES = {
+    "g": "get",
+    "s": "set",
+}
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pj",
         description="Private, single-user, 2FA-gated encrypted CLI journal.",
         epilog=(
             "examples:\n"
-            "  pj unlock                         Start timed session (runs setup on first use)\n"
-            "  pj new --tag work --tag notes     Create a new entry in sandboxed nvim\n"
-            "  pj search \"argon2\" --tag work     Search entries and pick via fzf\n"
-            "  pj view <id>                      Display an entry read-only\n"
-            "  pj edit <id>                      Edit an entry in sandboxed nvim\n"
-            "  pj status / pj lock               Check TTL or lock immediately\n"
+            "  pj unlock (ul)                    Start timed session (runs setup on first use)\n"
+            "  pj new (n) --tag work             Create a new entry in sandboxed nvim\n"
+            "  pj search (s, ls) \"argon2\"        Search entries and pick via fzf\n"
+            "  pj view (v) <id>                  Display an entry read-only\n"
+            "  pj edit (e) <id>                  Edit an entry in sandboxed nvim\n"
+            "  pj delete (d, rm) <id>            Delete an entry\n"
+            "  pj status (st) / pj lock (lk)     Check TTL or lock immediately\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {_get_version()}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("unlock", help="Verify password + TOTP and start timed session.")
-    sub.add_parser("lock", help="Lock immediately and wipe session memory.")
-    sub.add_parser("status", help="Show lock state and remaining timeout.")
+    sub.add_parser("unlock", aliases=["ul"], help="Verify password + TOTP and start timed session.")
+    sub.add_parser("lock", aliases=["lk"], help="Lock immediately and wipe session memory.")
+    sub.add_parser("status", aliases=["st"], help="Show lock state and remaining timeout.")
 
-    p_new = sub.add_parser("new", help="Create a new journal entry via sandboxed nvim.")
+    p_new = sub.add_parser("new", aliases=["n"], help="Create a new journal entry via sandboxed nvim.")
     p_new.add_argument("--tag", action="append", default=[], help="Tag for the entry (repeatable).")
 
-    p_edit = sub.add_parser("edit", help="Edit an existing entry via sandboxed nvim.")
+    p_edit = sub.add_parser("edit", aliases=["e"], help="Edit an existing entry via sandboxed nvim.")
     p_edit.add_argument("id", help="Entry ID.")
     p_edit.add_argument("--tag", action="append", default=None, help="Replace entry tags (repeatable).")
 
-    p_view = sub.add_parser("view", help="Display an entry read-only.")
+    p_view = sub.add_parser("view", aliases=["v"], help="Display an entry read-only.")
     p_view.add_argument("id", help="Entry ID.")
 
-    p_del = sub.add_parser("delete", help="Delete an entry.")
+    p_del = sub.add_parser("delete", aliases=["d", "rm"], help="Delete an entry.")
     p_del.add_argument("id", help="Entry ID.")
 
     p_search = sub.add_parser(
         "search",
+        aliases=["s", "ls"],
         help="Search/list entries via transient index and fzf.",
         description="Search unlocked entries in memory. Lists all entries when no query or filter is given.",
     )
@@ -78,11 +100,11 @@ def _build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--id", action="store_true", help="Print selected entry ID.")
     mode.add_argument("--edit", action="store_true", help="Open selected entry in nvim.")
 
-    p_cfg = sub.add_parser("config", help="Read or update configuration (unlock_timeout, data_dir).")
+    p_cfg = sub.add_parser("config", aliases=["cfg"], help="Read or update configuration (unlock_timeout, data_dir).")
     cfg_sub = p_cfg.add_subparsers(dest="config_action", required=True)
-    p_cget = cfg_sub.add_parser("get", help="Get a config value.")
+    p_cget = cfg_sub.add_parser("get", aliases=["g"], help="Get a config value.")
     p_cget.add_argument("key", help="Config key (unlock_timeout, data_dir).")
-    p_cset = cfg_sub.add_parser("set", help="Set a config value.")
+    p_cset = cfg_sub.add_parser("set", aliases=["s"], help="Set a config value.")
     p_cset.add_argument("key", help="Config key (unlock_timeout, data_dir).")
     p_cset.add_argument("value", help="New config value.")
 
@@ -123,16 +145,17 @@ def main(argv: list[str] | None = None) -> int:
     disable_core_dumps()
     parser = _build_parser()
     args = parser.parse_args(argv)
+    command = _COMMAND_ALIASES.get(args.command, args.command)
     client = SessionClient()
 
     try:
-        if args.command == "unlock":
+        if command == "unlock":
             return _handle_unlock(client)
-        if args.command == "lock":
+        if command == "lock":
             client.lock()
             print("Locked.")
             return 0
-        if args.command == "status":
+        if command == "status":
             st = client.status()
             if st.unlocked:
                 print(f"Unlocked ({int(st.remaining_seconds)}s remaining)")
@@ -142,24 +165,24 @@ def main(argv: list[str] | None = None) -> int:
 
         _require_unlocked(client)
 
-        if args.command == "new":
+        if command == "new":
             entry = create_entry_with_editor(client, tags=args.tag)
             if entry is not None:
                 print(entry.id)
             return 0
-        if args.command == "edit":
+        if command == "edit":
             entry = edit_entry_with_editor(client, args.id, tags=args.tag)
             print(entry.id)
             return 0
-        if args.command == "view":
+        if command == "view":
             entry = client.load_entry(args.id)
             print(format_entry_view(entry))
             return 0
-        if args.command == "delete":
+        if command == "delete":
             client.delete_entry(args.id)
             print(f"Deleted {args.id}")
             return 0
-        if args.command == "search":
+        if command == "search":
             matches = search_entries(
                 client,
                 query=args.query,
@@ -182,10 +205,11 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(format_entry_view(client.load_entry(selected_id)))
             return 0
-        if args.command == "config":
-            if args.config_action == "get":
+        if command == "config":
+            cfg_action = _CONFIG_ALIASES.get(args.config_action, args.config_action)
+            if cfg_action == "get":
                 print(get_config_value(args.key))
-            elif args.config_action == "set":
+            elif cfg_action == "set":
                 set_config_value(args.key, args.value)
             return 0
 

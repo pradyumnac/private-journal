@@ -208,3 +208,13 @@ Feature: Config Management & Thin CLI (pj)
     When the user creates, views, edits, searches (--plain and fzf), and deletes entries via pj
     Then each command delegates to the library and returns expected exit codes and output
     And pj status reports unlocked before pj lock, and locked after pj lock
+
+  Scenario: Support short semantic aliases for all CLI subcommands
+    Given the pj CLI entry point
+    When the user invokes short aliases (ul, lk, st, n, e, v, d, rm, s, ls, cfg)
+    Then each alias dispatches to its corresponding subcommand identically
+
+  Scenario: Verify full lifecycle demo script runs cleanly end-to-end
+    Given the standalone demo script scripts/demo_lifecycle.py
+    When executed with --fast in an isolated tmp sandbox
+    Then it exits 0, completes all 7 lifecycle stages, and removes its tmp sandbox

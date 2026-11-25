@@ -108,10 +108,10 @@ On the first run, `pj unlock` prompts for a vault password, prints the TOTP secr
 `pj new` prints the new entry `<id>` on save. You can also get an `<id>` from `pj search --id` or `pj search --plain`, or skip IDs altogether by using `pj search` (opens `view`) and `pj search --edit` (opens `edit`).
 
 ```bash
-pj new --tag work --tag notes   # Create an entry in sandboxed nvim (prints <id>)
-pj view <id>                     # Display decrypted entry read-only
-pj edit <id>                     # Edit entry in sandboxed nvim
-pj delete <id>                   # Delete encrypted entry
+pj new --tag work --tag notes   # (alias: n)  Create an entry in sandboxed nvim (prints <id>)
+pj view <id>                     # (alias: v)  Display decrypted entry read-only
+pj edit <id>                     # (alias: e)  Edit entry in sandboxed nvim
+pj delete <id>                   # (alias: d, rm) Delete encrypted entry
 ```
 
 `nvim` runs with `-n -i NONE` and `nobackup`/`nowritebackup`/`noundofile`/`noswapfile` on a `0600` file in `$XDG_RUNTIME_DIR`, zero-wiped and deleted on exit.

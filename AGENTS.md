@@ -12,6 +12,7 @@
 - Single CLI entry point: `pj` (`src/private_journal/`).
 - Tooling: `mise` (`mise.toml`) for version pinning and tasks (`mise run test`, `mise run release`), `uv` for dependency management and packaging (`uv build`).
 - Release: Build `pip`-installable wheel and sdist with `uv build` and distribute via tagged GitHub Releases (`v*`, `gh release create`) with `git-cliff` release notes (do not create `CHANGELOG.md`). Do not upload to PyPI.
+- Pre-release gate: Before every release (`mise run release`), run `uv run pytest -v` and `uv run python scripts/demo_lifecycle.py -v --fast` and agentically verify the full lifecycle text output matches expected behavior.
 - CI & Hooks: No GitHub Actions/CI executions. Pre-commit hook (`.githooks/pre-commit`) runs `uv run pytest -q`.
 - Runtime: Python, `cryptography`, `pyotp`.
 - External tools: `nvim` (editor), `fzf` (interactive search/list).
@@ -45,15 +46,15 @@
 
 All operations require an active timeout-based `unlock` session, except `unlock`, `lock`, `status`, and QoL flags (`--help`, `--version`).
 
-- `unlock` — Verify password + TOTP and start/extend the timed session.
-- `lock` — Lock immediately and wipe session memory.
-- `status` — Show lock state and remaining timeout.
-- `new` — Create a new entry via sandboxed `nvim`.
-- `edit` — Edit an entry via sandboxed `nvim`.
-- `view` — Display an entry read-only.
-- `delete` — Delete an entry.
-- `search` — Run transient full-text search with tag/date filters and list entries via `fzf` (`--no-history`, opens `view` on select, `--edit`/`--id`/`--plain` options).
-- `config get` / `config set` — Read and update configuration (`unlock_timeout` default `15m`, `data_dir` default XDG).
+- `unlock` (`ul`) — Verify password + TOTP and start/extend the timed session.
+- `lock` (`lk`) — Lock immediately and wipe session memory.
+- `status` (`st`) — Show lock state and remaining timeout.
+- `new` (`n`) — Create a new entry via sandboxed `nvim`.
+- `edit` (`e`) — Edit an entry via sandboxed `nvim`.
+- `view` (`v`) — Display an entry read-only.
+- `delete` (`d`, `rm`) — Delete an entry.
+- `search` (`s`, `ls`) — Run transient full-text search with tag/date filters and list entries via `fzf` (`--no-history`, opens `view` on select, `--edit`/`--id`/`--plain` options).
+- `config get` / `config set` (`cfg g` / `cfg s`) — Read and update configuration (`unlock_timeout` default `15m`, `data_dir` default XDG).
 
 ## Roadmap
 

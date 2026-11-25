@@ -200,3 +200,52 @@ def test_cli_full_entry_workflow(tmp_path, monkeypatch, capsys):
 
     assert main(["status"]) == 0
     assert "locked" in capsys.readouterr().out.lower()
+
+
+# Traceability: Feature "Config Management & Thin CLI (pj)"
+# Scenario: Support short semantic aliases for all CLI subcommands
+def test_cli_short_aliases(tmp_path, monkeypatch, capsys):
+    _setup_cli_env(tmp_path, monkeypatch)
+    res = initialize_vault(password=b"alias-pass-123")
+
+    monkeypatch.setattr("private_journal.cli.getpass.getpass", lambda _p="": "alias-pass-123")
+    monkeypatch.setattr("builtins.input", lambda _p="": pyotp.TOTP(res.totp_secret).now())
+
+    assert main(["ul"]) == 0
+    capsys.readouterr()
+    try:
+        assert main(["st"]) == 0
+        assert "unlocked" in capsys.readouterr().out.lower()
+
+        def fake_nvim(cmd, check=False):
+            Path(cmd[-1]).write_text("Alias note", encoding="utf-8")
+
+            class _R:
+                returncode = 0
+
+            return _R()
+
+        monkeypatch.setattr("private_journal.editor.subprocess.run", fake_nvim)
+        assert main(["n", "--tag", "alias"]) == 0
+        entry_id = capsys.readouterr().out.strip()
+
+        assert main(["v", entry_id]) == 0
+        assert "Alias note" in capsys.readouterr().out
+
+        assert main(["e", entry_id]) == 0
+        capsys.readouterr()
+
+        assert main(["s", "--plain"]) == 0
+        assert entry_id in capsys.readouterr().out
+        assert main(["ls", "--plain"]) == 0
+        assert entry_id in capsys.readouterr().out
+
+        assert main(["cfg", "g", "unlock_timeout"]) == 0
+        assert capsys.readouterr().out.strip() == "15m"
+        assert main(["cfg", "s", "unlock_timeout", "20m"]) == 0
+        capsys.readouterr()
+
+        assert main(["d", entry_id]) == 0
+        capsys.readouterr()
+    finally:
+        assert main(["lk"]) == 0

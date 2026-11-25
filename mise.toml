@@ -7,10 +7,11 @@ description = "Run full test suite via uv"
 run = "uv run pytest -v"
 
 [tasks.release]
-description = "Build wheel/sdist, tag, generate changelog, and publish GitHub Release"
+description = "Run tests, verify demo output, build wheel/sdist, tag, and publish GitHub Release"
 run = """
 set -euo pipefail
 uv run pytest -v
+uv run python scripts/demo_lifecycle.py -v --fast
 rm -rf dist
 uv build
 VER=$(uv version --short)
