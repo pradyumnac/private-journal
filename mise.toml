@@ -13,36 +13,8 @@ run = "uv run python scripts/demo_lifecycle.py --record-cast docs/demo.cast --re
 
 [tasks.bump]
 description = "Bump version (patch|minor|major), update man page and lockfile, commit, and push"
-run = '''
-set -euo pipefail
-PART="${1:-patch}"
-git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ] || { echo "Error: working tree is not clean." >&2; exit 1; }
-uv version --bump "$PART"
-VER=$(uv version --short)
-sed -i -E "s/\"private-journal [0-9]+\.[0-9]+\.[0-9]+\"/\"private-journal ${VER}\"/" man/man1/pj.1
-uv lock
-git add pyproject.toml uv.lock man/man1/pj.1
-git commit -m "Bump version to ${VER}"
-git push origin main
-'''
+run = "./scripts/bump.sh"
 
 [tasks.release]
 description = "Enforce clean synced tree, run tests & demo, build, tag (vX.Y.Z + latest), and publish GitHub Release"
-run = '''
-set -euo pipefail
-git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ] || { echo "Error: working tree has uncommitted or untracked changes." >&2; exit 1; }
-[ "$(git branch --show-current)" = "main" ] || { echo "Error: release must run from main." >&2; exit 1; }
-git fetch origin main --quiet
-[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "Error: local main is not synced with origin/main." >&2; exit 1; }
-uv run pytest -v
-uv run python scripts/demo_lifecycle.py -v --fast
-rm -rf dist
-uv build
-VER=$(uv version --short)
-TAG="v${VER}"
-git tag -a "$TAG" -m "Release $TAG"
-git push origin "$TAG"
-git tag -f latest
-git push -f origin latest
-git-cliff --current --strip header | gh release create "$TAG" dist/* --title "$TAG" --notes-file -
-'''
+run = "./scripts/release.sh"
