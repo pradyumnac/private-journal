@@ -1,6 +1,6 @@
 [project]
 name = "private-journal"
-version = "0.1.5"
+version = "0.1.6"
 description = "Single-user, 2FA-gated encrypted CLI journal with sandboxed nvim and transient search"
 readme = "README.md"
 license = "MIT"
