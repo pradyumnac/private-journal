@@ -61,7 +61,7 @@ def test_unlock_rejects_bad_password_bad_totp_and_replay(tmp_path, monkeypatch):
 
     try:
         valid_code = pyotp.TOTP(res.totp_secret).now()
-        with pytest.raises(SessionError):
+        with pytest.raises(SessionError, match="Invalid password"):
             client.unlock(password=b"wrong-pass", totp_code=valid_code)
         assert client.status().unlocked is False
 

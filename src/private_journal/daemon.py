@@ -182,17 +182,34 @@ class _SessionDaemon:
         try:
             if "key_check" in meta:
                 check_subkey = derive_subkey(candidate_mk, b"key-check")
-                if aead_decrypt(check_subkey, base64.b64decode(meta["key_check"]), KEY_CHECK_AD) != KEY_CHECK_PLAINTEXT:
-                    raise CryptoError("Invalid password.")
+                try:
+                    ok = (
+                        aead_decrypt(
+                            check_subkey,
+                            base64.b64decode(meta["key_check"]),
+                            KEY_CHECK_AD,
+                        )
+                        == KEY_CHECK_PLAINTEXT
+                    )
+                except CryptoError as exc:
+                    raise SessionError("Invalid password.") from exc
+                if not ok:
+                    raise SessionError("Invalid password.")
             if totp_enabled:
                 encrypted_totp = base64.b64decode(meta["encrypted_totp"])
                 totp_subkey = derive_subkey(candidate_mk, b"totp-secret")
-                secret = aead_decrypt(totp_subkey, encrypted_totp, TOTP_AD).decode("utf-8")
+                try:
+                    secret = aead_decrypt(totp_subkey, encrypted_totp, TOTP_AD).decode("utf-8")
+                except CryptoError as exc:
+                    raise SessionError("Invalid password.") from exc
                 accepted_tc = verify_totp_code(secret, totp_code, self._last_timecode)
                 self._last_timecode = accepted_tc
         except CryptoError as exc:
             candidate_mk.zeroize()
             raise SessionError(f"Authentication failed: {exc}") from exc
+        except SessionError:
+            candidate_mk.zeroize()
+            raise
 
         if self._master_key is not None:
             self._master_key.zeroize()

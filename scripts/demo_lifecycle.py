@@ -193,7 +193,8 @@ class DemoRunner:
 
             # 6. Edit, config, and delete
             self.scene(6, 7, "EDIT ENTRY, UPDATE CONFIG & DELETE")
-            self.run_pj(["edit", entry_id, "--tag", "security", "--tag", "verified"])
+            self.run_pj(["edit", entry_id])
+            self.run_pj(["tag", entry_id, "-a", "verified", "-r", "crypto"])
             self.run_pj(["view", entry_id])
             self.run_pj(["config", "get", "unlock_timeout"])
             self.run_pj(["config", "set", "unlock_timeout", "30m"])

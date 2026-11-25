@@ -65,7 +65,8 @@ pj unlock                        # (alias: ul) Start timed session
 ```bash
 pj new --tag work --tag notes   # (alias: n)  Create an entry in sandboxed nvim (prints <id>)
 pj view [id_or_prefix]           # (alias: v)  Display entry (uses fzf if omitted)
-pj edit [id_or_prefix]           # (alias: e)  Edit entry (uses fzf if omitted)
+pj edit [id_or_prefix]           # (alias: e)  Edit entry in sandboxed nvim (uses fzf if omitted)
+pj tag [id_or_prefix] [-a|-r|-s] # (alias: t)  View/add/remove/set tags (uses fzf if omitted)
 pj delete [id_or_prefix] [--yes] # (alias: d, rm) Delete entry (uses fzf if omitted)
 pj completion bash|zsh|fish      # Generate shell autocompletion script
 ```

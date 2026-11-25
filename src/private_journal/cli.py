@@ -109,6 +109,7 @@ def _delete_with_confirm(client: SessionClient, entry_id: str, yes: bool) -> Non
         "rm": "delete",
         "s": "search",
         "ls": "search",
+        "t": "tag",
         "cfg": "config",
     },
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -225,18 +226,53 @@ def new(client: SessionClient, tags: tuple[str, ...]) -> None:
         click.echo(entry.id)
 
 
-@cli.command(help="Edit an entry via sandboxed nvim (uses fzf if ID omitted). (alias: e)")
+@cli.command(help="Edit an entry via sandboxed nvim (uses fzf if ID omitted).")
 @click.argument("entry_id", metavar="[ID]", required=False, default=None)
-@click.option("--tag", "tags", multiple=True, help="Replace entry tags (repeatable).")
 @click.pass_obj
-def edit(client: SessionClient, entry_id: str | None, tags: tuple[str, ...]) -> None:
+def edit(client: SessionClient, entry_id: str | None) -> None:
     _require_unlocked(client)
     resolved = _pick_or_resolve_id(client, entry_id)
     if resolved is None:
         return
-    tag_list = list(tags) if tags else None
-    entry = edit_entry_with_editor(client, resolved, tags=tag_list)
+    entry = edit_entry_with_editor(client, resolved)
     click.echo(entry.id)
+
+
+@cli.command(help="View or update tags on an entry without opening nvim.")
+@click.argument("entry_id", metavar="[ID]", required=False, default=None)
+@click.option("-a", "--add", "add_tags", multiple=True, help="Add tag(s).")
+@click.option("-r", "--remove", "remove_tags", multiple=True, help="Remove tag(s).")
+@click.option("-s", "--set", "set_tags", multiple=True, help="Replace all tags.")
+@click.option("--clear", is_flag=True, help="Remove all tags.")
+@click.pass_obj
+def tag(
+    client: SessionClient,
+    entry_id: str | None,
+    add_tags: tuple[str, ...],
+    remove_tags: tuple[str, ...],
+    set_tags: tuple[str, ...],
+    clear: bool,
+) -> None:
+    _require_unlocked(client)
+    resolved = _pick_or_resolve_id(client, entry_id)
+    if resolved is None:
+        return
+    entry = client.load_entry(resolved)
+
+    if clear:
+        new_tags: list[str] = []
+    elif set_tags:
+        new_tags = list(set_tags)
+    elif add_tags or remove_tags:
+        remove_set = {t.strip().lower() for t in remove_tags if t.strip()}
+        new_tags = [t for t in entry.tags if t not in remove_set]
+        new_tags.extend(add_tags)
+    else:
+        click.echo(", ".join(entry.tags) if entry.tags else "(none)")
+        return
+
+    updated = client.save_entry(entry=entry.updated(tags=new_tags))
+    click.echo(", ".join(updated.tags) if updated.tags else "(none)")
 
 
 @cli.command(help="Display an entry read-only (uses fzf if ID omitted). (alias: v)")

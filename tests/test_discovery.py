@@ -145,3 +145,49 @@ def test_cli_shell_completion(shell, capsys):
     assert main(["completion", shell]) == 0
     out = capsys.readouterr().out
     assert "_PJ_COMPLETE" in out
+
+
+# Traceability: Feature "Click CLI, Shell Completion & ID-less Discovery"
+# Scenario: Manage tags on an existing entry without opening nvim
+def test_cli_tag_add_remove_set_clear_and_fzf_fallback(tmp_path, monkeypatch, capsys):
+    client = _setup_unlocked(tmp_path, monkeypatch)
+    try:
+        e1 = client.save_entry(body="Untouched body", tags=["work"])
+        prefix = e1.id[:4]
+
+        # Add tags by prefix
+        assert main(["tag", prefix, "-a", "urgent", "-a", "Work"]) == 0
+        assert "urgent" in capsys.readouterr().out
+        assert client.load_entry(e1.id).tags == ["work", "urgent"]
+
+        # Remove tag
+        assert main(["t", prefix, "-r", "work"]) == 0
+        capsys.readouterr()
+        assert client.load_entry(e1.id).tags == ["urgent"]
+
+        # Set tags
+        assert main(["t", prefix, "-s", "alpha", "-s", "beta"]) == 0
+        capsys.readouterr()
+        assert client.load_entry(e1.id).tags == ["alpha", "beta"]
+
+        # Show tags with no flags and fzf fallback when ID omitted
+        def fake_fzf(cmd, input=None, text=False, capture_output=False, check=False):
+            class _R:
+                returncode = 0
+                stdout = input.splitlines()[0] + "\n"
+
+            return _R()
+
+        monkeypatch.setattr("private_journal.search.subprocess.run", fake_fzf)
+        assert main(["t"]) == 0
+        assert "alpha, beta" in capsys.readouterr().out
+
+        # Clear tags with fzf fallback
+        assert main(["t", "--clear"]) == 0
+        capsys.readouterr()
+        reloaded = client.load_entry(e1.id)
+        assert reloaded.tags == []
+        assert reloaded.body == "Untouched body"
+        assert reloaded.created_at == e1.created_at
+    finally:
+        client.lock()

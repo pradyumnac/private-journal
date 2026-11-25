@@ -262,3 +262,9 @@ Feature: Click CLI, Shell Completion & ID-less Discovery
     Given the click-based pj CLI
     When the user runs pj completion bash, zsh, or fish
     Then the corresponding click shell completion script is printed to stdout
+
+  Scenario: Manage tags on an existing entry without opening nvim
+    Given an active unlocked session with an existing entry
+    When the user runs pj tag (or t) with --add, --remove, --set, --clear, or no flags
+    Then tags are updated and re-encrypted without launching nvim while preserving created_at and body
+    And omitting the entry ID launches fzf to select the entry

@@ -37,9 +37,14 @@ Create a new entry using sandboxed
 .BR nvim
 (\fB\-n \-i NONE\fR, \fBnobackup\fR, \fBnoundofile\fR, \fBnoswapfile\fR) on a \fB0600\fR temp file in \fB$XDG_RUNTIME_DIR\fR, wiped and deleted on exit.
 .TP
-.B edit ID [\-\-tag TAG]...
+.B edit [ID]
 Edit an existing entry in sandboxed
 .BR nvim .
+.TP
+.B tag [ID] [\-a TAG]... [\-r TAG]... [\-s TAG]... [\-\-clear]
+View or update tags on an entry without opening
+.BR nvim
+(uses \fBfzf\fR if ID omitted).
 .TP
 .B view ID
 Display a decrypted entry read-only.

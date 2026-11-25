@@ -52,6 +52,7 @@ All operations require an active timeout-based `unlock` session, except `setup`,
 - `status` (`st`) — Show lock state and remaining timeout.
 - `new` (`n`) — Create a new entry via sandboxed `nvim`.
 - `edit` (`e`) — Edit an entry via sandboxed `nvim`.
+- `tag` (`t`) — View, add, remove, set, or clear tags on an entry without opening `nvim` (`fzf` fallback when ID omitted).
 - `view` (`v`) — Display an entry read-only.
 - `delete` (`d`, `rm`) — Delete an entry.
 - `search` (`s`, `ls`) — Run transient full-text search with tag/date filters and list entries via `fzf` (`--no-history`, opens `view` on select, `--edit`/`--id`/`--plain` options).
