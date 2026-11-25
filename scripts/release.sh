@@ -31,4 +31,4 @@ git push origin "$TAG"
 git tag -f latest
 git push -f origin latest
 
-git-cliff --current --strip header | gh release create "$TAG" dist/* --title "$TAG" --notes-file -
+git-cliff --current --strip header | gh release create "$TAG" dist/* docs/demo.cast docs/demo.svg --title "$TAG" --notes-file -
