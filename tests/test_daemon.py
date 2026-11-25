@@ -86,12 +86,12 @@ def test_unlock_extends_session_ttl(tmp_path, monkeypatch):
     try:
         totp = pyotp.TOTP(res.totp_secret)
         now = int(time.time())
-        code1 = totp.at(now - 30)
+        code1 = totp.at(now)
         st1 = client.unlock(password=b"vault-pass-123", totp_code=code1)
         assert st1.unlocked is True
 
         time.sleep(0.8)
-        code2 = totp.at(now)
+        code2 = totp.at(now + 30)
         st2 = client.unlock(password=b"vault-pass-123", totp_code=code2)
         assert st2.unlocked is True
         assert st2.remaining_seconds > 1.2

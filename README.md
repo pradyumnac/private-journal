@@ -2,18 +2,13 @@
 
 Single-user, 2FA-gated encrypted CLI journal. Entries, metadata, and file names stay encrypted on disk. Editing runs in sandboxed `nvim`, and search runs over a transient in-memory index via `fzf`.
 
-## Key Facts
+## Overview
 
-| Property | Detail |
-| --- | --- |
-| Entry point | `pj` (Python >= 3.13) |
-| Cryptography | Argon2id, HKDF-SHA256, ChaCha20-Poly1305 (`cryptography`) |
-| 2FA | Google Authenticator-compatible TOTP (`pyotp`, `valid_window=1`, replay-checked) |
-| Memory safety | `mlock`ed key buffer, in-place zeroization, `RLIMIT_CORE=0` |
-| Storage | Single encrypted blob per entry, HMAC-SHA256 opaque filenames, `0600` files |
-| Session | Local `0600` Unix socket daemon (`SO_PEERCRED` UID check, 15m default TTL) |
-| External tools | `nvim`, `fzf` |
-| Local verification | 31/31 BDD-traceable tests passing across 9 library modules |
+- **Encrypted at rest:** Argon2id Master Key, HKDF per-file subkeys, ChaCha20-Poly1305 AEAD, HMAC-SHA256 opaque filenames, `0600` files.
+- **2FA unlock:** Password + Google Authenticator TOTP (`valid_window=1`, replay-checked) via a local `0600` Unix socket daemon (15m default TTL).
+- **Memory & editor safety:** `mlock`ed key buffer, in-place zeroization, `RLIMIT_CORE=0`, sandboxed `nvim` (`-n -i NONE`, `nobackup`/`noundofile`/`noswapfile`) in `$XDG_RUNTIME_DIR`.
+- **Transient search:** In-memory full-text, tag, and date search via `fzf --no-history`.
+- **Local stats:** 31/31 BDD-traceable tests passing across 9 library modules.
 
 ## Installation
 
@@ -43,8 +38,10 @@ On the first run, `pj unlock` prompts for a vault password, prints the TOTP secr
 
 ### 2. Creating, Viewing, Editing, and Deleting Entries
 
+`pj new` prints the new entry `<id>` on save. You can also get an `<id>` from `pj search --id` or `pj search --plain`, or skip IDs altogether by using `pj search` (opens `view`) and `pj search --edit` (opens `edit`).
+
 ```bash
-pj new --tag work --tag notes   # Create an entry in sandboxed nvim
+pj new --tag work --tag notes   # Create an entry in sandboxed nvim (prints <id>)
 pj view <id>                     # Display decrypted entry read-only
 pj edit <id>                     # Edit entry in sandboxed nvim
 pj delete <id>                   # Delete encrypted entry
